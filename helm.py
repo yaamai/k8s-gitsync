@@ -5,11 +5,15 @@ import hashlib
 import utils
 
 
+def _calc_helm_values_hash(values_dict):
+    return hashlib.sha256(json.dumps(values_dict, sort_keys=True).encode()).hexdigest()
+
+
 def _get_helm_values_hash(release_name):
     cmd = ["./linux-amd64/helm", "get", "values", release_name, "--output", "json"]
     outs, _, _ = utils.cmd_exec(cmd)
     values = json.loads(outs.decode())
-    return hashlib.sha256(json.dumps(values, sort_keys=True).encode()).hexdigest()
+    return _calc_helm_values_hash(values)
 
 
 def _get_helm_release_list():
@@ -31,9 +35,20 @@ def get_helm_state():
 
 def get_helm_manifest():
     _, helm_manifest_files = utils.get_manifest_files("repo")
-    for directory, filename_list in helm_manifest_files.items():
-        manifest = yaml.safe_load(open(f"{directory}/{filename_list[0]}"))
-        print(manifest)
+
+    manifest_dict = {}
+    for directory, manifest_files in helm_manifest_files.items():
+        manifest = yaml.safe_load(open(f'{directory}/{manifest_files["manifest"]}'))
+        # TODO: currently, only support one values file
+        values = yaml.safe_load(open(f'{directory}/{manifest_files["values"][0]}'))
+        id_str = f'helm.{manifest["namespace"]}.{manifest["name"]}'
+        manifest_dict[id_str] = {
+            "chart": f'{manifest["chart"]["name"]}-{manifest["chart"]["version"]}',
+            "values_hash": _calc_helm_values_hash(values)
+        }
+
+    pp(manifest_dict)
+    return manifest_dict
 
 
 def main():

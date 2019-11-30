@@ -11,15 +11,15 @@ def get_manifest_files(repo_dir):
     helm_values_pattern = re.compile(r'.helm$')
 
     def _get_helm_file(files):
-        ret = []
+        ret = {'manifest': None, 'values': []}
         for f in files:
             if helm_manifest_pattern.match(f):
-                ret.append(f)
+                ret['manifest'] = f
 
                 for values_file_pattern in [".values.yaml", ".values.yml"]:
                     values_file_path = helm_values_pattern.sub(values_file_pattern, f)
                     if values_file_path in files:
-                        ret.append(values_file_path)
+                        ret['values'].append(values_file_path)
         return ret
 
     logger.info("begin to walk manifest directory.")
