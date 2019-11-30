@@ -7,7 +7,7 @@ logger = log.getLogger(__name__)
 
 
 def get_manifest_files(repo_dir):
-    helm_manifest_pattern = re.compile(r'.*.helm')
+    helm_manifest_pattern = re.compile(r'.*.helm$')
     helm_values_pattern = re.compile(r'.helm$')
 
     def _get_helm_file(files):
