@@ -1,5 +1,8 @@
 import re
 import os
+import log
+
+logger = log.getLogger(__name__)
 
 
 def get_deploy_config(repo_dir):
@@ -20,8 +23,9 @@ def get_deploy_config(repo_dir):
 
     helm_deploy_config = {}
     k8s_deploy_config = {}
+    logger.info("begin to walk manifest directory.")
     for root, dirs, files in os.walk(repo_dir):
-        print(root, dirs, files)
+        logger.debug(root, dirs, files)
 
         helm_files = _get_helm_file(files)
         if helm_files:
@@ -31,7 +35,7 @@ def get_deploy_config(repo_dir):
         if k8s_files:
             k8s_deploy_config[root] = k8s_files
 
-    print(helm_deploy_config)
-    print(k8s_deploy_config)
+    logger.info(f"detected k8s manifest files: {k8s_deploy_config}")
+    logger.info(f"detected helm manifest files: {helm_deploy_config}")
 
     return k8s_deploy_config, helm_deploy_config
