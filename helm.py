@@ -85,13 +85,21 @@ def _safe_get(d, *args):
     return r
 
 
+def _hash_head(s):
+    if s == "[UNKNOWN]":
+        return s
+
+    return s[:8]
+
+
 def compare_state_and_manifest(state_dict, manifest_dict):
     for id_str, manifest in manifest_dict.items():
         logger.debug(f'Checking helm releases ...')
-        logger.debug(f'{id_str}:')
-        logger.debug(f'  not installed {id_str not in state_dict}')
-        logger.debug(f'  {manifest["chart"]} <-> {_safe_get(state_dict, id_str, "chart")}')
-        logger.debug(f'  {manifest["values_hash"]} <-> {_safe_get(state_dict, id_str, "values_hash")}')
+        logger.debug(f'  {id_str}:')
+        logger.debug(f'    not installed: {id_str not in state_dict}')
+        logger.debug(f'    chart ver    : {manifest["chart"]} <-> {_safe_get(state_dict, id_str, "chart")}')
+        logger.debug(f'    values hash  : {_hash_head(manifest["values_hash"])}'
+                     f' <-> {_hash_head(_safe_get(state_dict, id_str, "values_hash"))}')
         if (id_str not in state_dict or
                 manifest['chart'] != state_dict[id_str]['chart'] or
                 manifest['values_hash'] != state_dict[id_str]['values_hash']):
