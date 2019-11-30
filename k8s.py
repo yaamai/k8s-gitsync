@@ -1,8 +1,8 @@
 import json
 import yaml
 import hashlib
-from subprocess import Popen, PIPE
 import log
+import utils
 
 logger = log.getLogger(__name__)
 
@@ -11,9 +11,7 @@ LAST_APPLIED_KEY = "k8s-gitsync/last-applied-confighash"
 
 def _ensure_namespace(namespace):
     cmd = ["kubectl", "create", "namespace", namespace]
-    p = Popen(cmd, stdout=PIPE, stderr=PIPE)
-    outs, errs = p.communicate()
-    log.command_result_debug(logger, cmd, outs, errs)
+    utils.cmd_exec(cmd)
 
 
 def _parse_manifest_file(filepath):
@@ -32,10 +30,8 @@ def _get_state(manifest):
     kind = manifest["kind"]
 
     cmd = ["kubectl", "-n", namespace, "get", kind, name, "-o", "json"]
-    p = Popen(cmd, stdout=PIPE, stderr=PIPE)
-    outs, errs = p.communicate()
-    log.command_result_debug(logger, cmd, outs, errs)
-    if p.returncode != 0:
+    outs, _, rc = utils.cmd_exec(cmd)
+    if rc != 0:
         return None
     else:
         return json.loads(outs.decode())
@@ -49,9 +45,7 @@ def _apply_manifest(manifest, filehash):
     _ensure_namespace(manifest["metadata"]["namespace"])
 
     cmd = ["kubectl", "apply", "-f", "-"]
-    p = Popen(cmd, stdin=PIPE, stdout=PIPE, stderr=PIPE)
-    outs, errs = p.communicate(yaml.dump(manifest).encode())
-    log.command_result_debug(logger, cmd, outs, errs)
+    _, errs, _ = utils.cmd_exec(cmd)
     if errs:
         logger.error(f"failed to execute kubectl apply, {errs}")
 
