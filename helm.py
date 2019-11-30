@@ -33,7 +33,7 @@ def get_helm_state():
 
 def main():
     # get_helm_state()
-    utils.get_deploy_config()
+    utils.get_deploy_config("repo")
 
 
 if __name__ == "__main__":

@@ -2,7 +2,7 @@ import re
 import os
 
 
-def get_deploy_config():
+def get_deploy_config(repo_dir):
     helm_deploy_config_pattern = re.compile(r".*.helm")
     helm_values_pattern = re.compile(r".helm$")
 
@@ -20,7 +20,7 @@ def get_deploy_config():
 
     helm_deploy_config = {}
     k8s_deploy_config = {}
-    for root, dirs, files in os.walk("repo"):
+    for root, dirs, files in os.walk(repo_dir):
         print(root, dirs, files)
 
         helm_files = _get_helm_file(files)
