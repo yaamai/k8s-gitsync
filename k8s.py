@@ -2,45 +2,71 @@ import json
 import yaml
 import hashlib
 from subprocess import Popen, PIPE
+import log
+
+logger = log.getLogger(__name__)
+
+LAST_APPLIED_KEY = "k8s-gitsync/last-applied-confighash"
 
 
-def ensure_namespace(namespace):
+def _ensure_namespace(namespace):
     cmd = ["kubectl", "create", "namespace", namespace]
-    p = Popen(cmd, stdout=PIPE)
-    return p.communicate()
+    p = Popen(cmd, stdout=PIPE, stderr=PIPE)
+    outs, errs = p.communicate()
+    log.command_result_debug(logger, cmd, outs, errs)
 
 
-def parse_manifest_file(filepath):
+def _parse_manifest_file(filepath):
     with open(filepath) as f:
         filecontent = f.read()
 
     filehash = hashlib.sha256(filecontent.encode()).hexdigest()
     manifest = yaml.safe_load(filecontent)
 
-    return (filehash, manifest)
+    return (manifest, filehash)
 
 
-def different_manifest_and_state(filepath):
-    filehash, manifest = parse_manifest_file(filepath)
-
+def _get_state(manifest):
     namespace = manifest["metadata"]["namespace"]
     name = manifest["metadata"]["name"]
     kind = manifest["kind"]
 
     cmd = ["kubectl", "-n", namespace, "get", kind, name, "-o", "json"]
-    p = Popen(cmd, stdout=PIPE)
+    p = Popen(cmd, stdout=PIPE, stderr=PIPE)
     outs, errs = p.communicate()
-    state = json.loads(outs.decode())
+    log.command_result_debug(logger, cmd, outs, errs)
+    if p.returncode != 0:
+        return None
+    else:
+        return json.loads(outs.decode())
 
-    statehash = state["metadata"]["last-applied-confighash"]
 
-    return filehash != statehash
+def _apply_manifest(manifest, filehash):
+    if manifest["metadata"].get("annotations") is None:
+        manifest["metadata"]["annotations"] = {}
+    manifest["metadata"]["annotations"][LAST_APPLIED_KEY] = filehash
+
+    _ensure_namespace(manifest["metadata"]["namespace"])
+
+    cmd = ["kubectl", "apply", "-f", "-"]
+    p = Popen(cmd, stdin=PIPE, stdout=PIPE, stderr=PIPE)
+    outs, errs = p.communicate(yaml.dump(manifest).encode())
+    log.command_result_debug(logger, cmd, outs, errs)
+    if errs:
+        logger.error(f"failed to execute kubectl apply, {errs}")
 
 
-def apply(filepath):
-    filehash, manifest = parse_manifest_file(filepath)
-    manifest["metadata"]["last-applied-confighash"] = filehash
+def create_or_update(filepath):
+    manifest, filehash = _parse_manifest_file(filepath)
+    state = _get_state(manifest)
 
-    cmd = ["kubectl", "-f", "-"]
-    p = Popen(cmd, stdout=PIPE)
-    return p.communicate(yaml.dump(manifest))
+    if state is not None and filehash == state["metadata"].get("annotations", {}).get(LAST_APPLIED_KEY):
+        return
+
+    logger.info(f"applying {manifest['metadata']}")
+    _apply_manifest(manifest, filehash)
+    logger.info(f"applied {manifest['metadata']}")
+
+
+def destroy_unless_exist_in(manifest_filepaths):
+    pass
