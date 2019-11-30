@@ -1,3 +1,4 @@
+import yaml
 import subprocess
 import json
 from subprocess import PIPE
@@ -12,7 +13,7 @@ def _get_helm_values_hash(release_name):
     )
     values = json.loads(cmd_output.stdout.decode())
     pp(values)
-    return hashlib.sha256(json.dumps(values).encode()).hexdigest()
+    return hashlib.sha256(json.dumps(values, sort_keys=True).encode()).hexdigest()
 
 
 def _get_helm_release_list():
@@ -31,9 +32,18 @@ def get_helm_state():
     pp(state)
 
 
+def get_helm_manifest():
+    _, helm_manifest_files = utils.get_manifest_files("repo")
+    for directory, filename_list in helm_manifest_files.items():
+        manifest = yaml.safe_load(open(f'{directory}/{filename_list[0]}'))
+        print(manifest)
+
+
 def main():
-    # get_helm_state()
-    utils.get_deploy_config("repo")
+    # print(hashlib.sha256(json.dumps({"b": 100, "a": 200}, sort_keys=True).encode()).hexdigest())
+    # print(hashlib.sha256(json.dumps({"a": 200, "b": 100}, sort_keys=True).encode()).hexdigest())
+    get_helm_state()
+    get_helm_manifest()
 
 
 if __name__ == "__main__":
