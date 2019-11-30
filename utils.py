@@ -1,9 +1,10 @@
 import re
 import os
 
+
 def get_deploy_config():
-    helm_deploy_config_pattern = re.compile(r'.*.helm')
-    helm_values_pattern = re.compile(r'.helm$')
+    helm_deploy_config_pattern = re.compile(r".*.helm")
+    helm_values_pattern = re.compile(r".helm$")
 
     def _get_helm_file(files):
         ret = []
@@ -11,7 +12,7 @@ def get_deploy_config():
             if helm_deploy_config_pattern.match(f):
                 ret.append(f)
 
-                for values_file_pattern in ['.values.yaml', '.values.yml']:
+                for values_file_pattern in [".values.yaml", ".values.yml"]:
                     values_file_path = helm_values_pattern.sub(values_file_pattern, f)
                     if values_file_path in files:
                         ret.append(values_file_path)
@@ -19,7 +20,7 @@ def get_deploy_config():
 
     helm_deploy_config = {}
     k8s_deploy_config = {}
-    for root, dirs, files in os.walk('repo'):
+    for root, dirs, files in os.walk("repo"):
         print(root, dirs, files)
 
         helm_files = _get_helm_file(files)
