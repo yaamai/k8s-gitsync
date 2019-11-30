@@ -1,24 +1,21 @@
 import yaml
-import subprocess
 import json
-from subprocess import PIPE
 from pprint import pprint as pp
 import hashlib
 import utils
 
 
 def _get_helm_values_hash(release_name):
-    cmd_output = subprocess.run(
-        ["./linux-amd64/helm", "get", "values", release_name, "--output", "json"], stdout=PIPE, stderr=PIPE
-    )
-    values = json.loads(cmd_output.stdout.decode())
-    pp(values)
+    cmd = ["./linux-amd64/helm", "get", "values", release_name, "--output", "json"]
+    outs, _, _ = utils.cmd_exec(cmd)
+    values = json.loads(outs.decode())
     return hashlib.sha256(json.dumps(values, sort_keys=True).encode()).hexdigest()
 
 
 def _get_helm_release_list():
-    cmd_output = subprocess.run(["./linux-amd64/helm", "list", "--output", "json"], stdout=PIPE, stderr=PIPE)
-    release_list = json.loads(cmd_output.stdout.decode())["Releases"]
+    cmd = ["./linux-amd64/helm", "list", "--output", "json"]
+    outs, _, _ = utils.cmd_exec(cmd)
+    release_list = json.loads(outs.decode())["Releases"]
     return release_list
 
 
@@ -35,7 +32,7 @@ def get_helm_state():
 def get_helm_manifest():
     _, helm_manifest_files = utils.get_manifest_files("repo")
     for directory, filename_list in helm_manifest_files.items():
-        manifest = yaml.safe_load(open(f'{directory}/{filename_list[0]}'))
+        manifest = yaml.safe_load(open(f"{directory}/{filename_list[0]}"))
         print(manifest)
 
 
