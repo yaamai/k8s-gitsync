@@ -1,9 +1,11 @@
 import re
 import yaml
 import json
-from pprint import pprint as pp
 import hashlib
 import utils
+import log
+
+logger = log.getLogger(__name__)
 
 
 def _calc_helm_values_hash(values_dict):
@@ -35,7 +37,7 @@ def _upgrade_or_install_helm_release(release_name, namespace, version, chart_nam
     outs, _, _ = utils.cmd_exec(cmd, values)
 
     # remove WARNING:
-    warning_log_re = re.compile(r'^WARNING:.*')
+    warning_log_re = re.compile(r'^(WARNING|DEBUG):.*', re.MULTILINE)
     outs_json = warning_log_re.sub("", outs.decode())
 
     return json.loads(outs_json)
@@ -43,7 +45,6 @@ def _upgrade_or_install_helm_release(release_name, namespace, version, chart_nam
 
 def get_helm_state():
     release_list = _get_helm_release_list()
-    pp(release_list)
     state = {}
     for e in release_list:
         state_id_str = f'helm.{e["Namespace"]}.{e["Name"]}'
@@ -58,8 +59,12 @@ def get_helm_manifest():
     for directory, manifest_files in helm_manifest_files.items():
         manifest = yaml.safe_load(open(f'{directory}/{manifest_files["manifest"]}'))
         # TODO: currently, only support one values file
-        print(open(f'{directory}/{manifest_files["values"][0]}', "rb").read())
         values = yaml.safe_load(open(f'{directory}/{manifest_files["values"][0]}'))
+
+        # helm consider null values to {}
+        if values is None:
+            values = {}
+
         id_str = f'helm.{manifest["namespace"]}.{manifest["name"]}'
         manifest_dict[id_str] = {
             "chart": f'{manifest["chart"]["name"]}-{manifest["chart"]["version"]}',
@@ -68,12 +73,25 @@ def get_helm_manifest():
             "_values_data": values
         }
 
-    pp(manifest_dict)
     return manifest_dict
+
+
+def _safe_get(d, *args):
+    r = d
+    for k in args:
+        if k not in r:
+            return "[UNKNOWN]"
+        r = r[k]
+    return r
 
 
 def compare_state_and_manifest(state_dict, manifest_dict):
     for id_str, manifest in manifest_dict.items():
+        logger.debug(f'Checking helm releases ...')
+        logger.debug(f'{id_str}:')
+        logger.debug(f'  not installed {id_str not in state_dict}')
+        logger.debug(f'  {manifest["chart"]} <-> {_safe_get(state_dict, id_str, "chart")}')
+        logger.debug(f'  {manifest["values_hash"]} <-> {_safe_get(state_dict, id_str, "values_hash")}')
         if (id_str not in state_dict or
                 manifest['chart'] != state_dict[id_str]['chart'] or
                 manifest['values_hash'] != state_dict[id_str]['values_hash']):
@@ -81,8 +99,6 @@ def compare_state_and_manifest(state_dict, manifest_dict):
 
 
 def main():
-    # print(hashlib.sha256(json.dumps({"b": 100, "a": 200}, sort_keys=True).encode()).hexdigest())
-    # print(hashlib.sha256(json.dumps({"a": 200, "b": 100}, sort_keys=True).encode()).hexdigest())
     state_dict = get_helm_state()
     manifest_dict = get_helm_manifest()
     for id_str, manifest, values in compare_state_and_manifest(state_dict, manifest_dict):
@@ -91,7 +107,7 @@ def main():
             manifest['namespace'],
             manifest['chart']['version'],
             manifest['chart']['name'],
-            values)
+            yaml.safe_dump(values).encode())
 
 
 if __name__ == "__main__":
