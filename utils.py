@@ -1,5 +1,6 @@
 import re
 import os
+from subprocess import Popen, PIPE
 import log
 
 logger = log.getLogger(__name__)
@@ -39,3 +40,10 @@ def get_manifest_files(repo_dir):
     logger.info(f"detected helm manifest files: {helm_manifest}")
 
     return k8s_manifest, helm_manifest
+
+
+def cmd_exec(cmd, stdin=None):
+    p = Popen(cmd, stdin=PIPE, stdout=PIPE, stderr=PIPE)
+    outs, errs = p.communicate(stdin)
+    log.command_result_debug(logger, cmd, outs, errs)
+    return outs, errs, p.returncode
