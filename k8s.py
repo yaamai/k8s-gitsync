@@ -1,12 +1,14 @@
 import json
 import yaml
 import hashlib
+from collections import defaultdict
 import log
 import utils
 
 logger = log.getLogger(__name__)
 
 LAST_APPLIED_KEY = "k8s-gitsync/last-applied-confighash"
+KGS_LABEL = "k8s-gitsync/mamaged"
 
 
 def _ensure_namespace(namespace):
@@ -63,4 +65,26 @@ def create_or_update(filepath):
 
 
 def destroy_unless_exist_in(manifest_filepaths):
+    manifest_ids_per_kind = defaultdict(list)
+    for filepath in manifest_filepaths:
+        m, _ = _parse_manifest_file(filepath)
+        manifest_id = f'{m["matadata"]["namespace"]}.{m["metadata"]["name"]}'
+        manifest_ids_per_kind[m["kind"]].append(manifest_id)
+
+    cmd = ["kubectl", "api-resources"]
+    outs, _, _ = utils.cmd_exec(cmd)
+    kinds = outs.decode().split()
+
+    for kind in kinds:
+        cmd = ["kubectl", "--all-namespaces", "-l", KGS_LABEL+"=true", "get", kind, "-o", "json"]
+        outs, _, _ = utils.cmd_exec(cmd)
+        states = json.loads(outs.decode())["items"]
+
+        for s in states:
+            state_id = f'{s["matadata"]["namespace"]}.{s["metadata"]["name"]}'
+            if state_id not in manifest_ids_per_kind[kind]:
+                _delete_state(state)
+
+
+def _delete_state(state):
     pass
