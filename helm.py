@@ -13,21 +13,23 @@ def _calc_helm_values_hash(values_dict):
 
 
 def _get_helm_values_hash(release_name):
-    cmd = ["./linux-amd64/helm", "get", "values", release_name, "--output", "json"]
+    cmd = ["./helm2/helm", "get", "values", release_name, "--output", "json"]
     outs, _, _ = utils.cmd_exec(cmd)
     values = json.loads(outs.decode())
     return _calc_helm_values_hash(values)
 
 
 def _get_helm_release_list():
-    cmd = ["./linux-amd64/helm", "list", "--output", "json"]
+    cmd = ["./helm2/helm", "list", "--output", "json"]
     outs, _, _ = utils.cmd_exec(cmd)
-    release_list = json.loads(outs.decode())["Releases"]
-    return release_list
+    if not outs:
+        return []
+    release_list = json.loads(outs.decode())
+    return release_list["Releases"]
 
 
 def _upgrade_or_install_helm_release(release_name, namespace, version, chart_name, values):
-    cmd = ["./linux-amd64/helm", "upgrade",
+    cmd = ["./helm2/helm", "upgrade",
            "--output", "json",
            "--install", release_name,
            "--namespace", namespace,
@@ -37,7 +39,7 @@ def _upgrade_or_install_helm_release(release_name, namespace, version, chart_nam
     outs, _, _ = utils.cmd_exec(cmd, values)
 
     # remove WARNING:
-    warning_log_re = re.compile(r'^(WARNING|DEBUG):.*', re.MULTILINE)
+    warning_log_re = re.compile(r'^(WARNING:|DEBUG:|Release).*', re.MULTILINE)
     outs_json = warning_log_re.sub("", outs.decode())
 
     return json.loads(outs_json)
