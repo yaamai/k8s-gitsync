@@ -4,6 +4,7 @@ import json
 import hashlib
 import utils
 import log
+import os.path
 
 logger = log.getLogger(__name__)
 
@@ -93,22 +94,26 @@ def _get_state(helm_client):
 
 def _get_manifest(helm_manifest_files):
     manifest_dict = {}
-    for directory, manifest_files in helm_manifest_files.items():
-        manifest = yaml.safe_load(open(f'{directory}/{manifest_files["manifest"]}'))
-        # TODO: currently, only support one values file
-        values = yaml.safe_load(open(f'{directory}/{manifest_files["values"][0]}'))
+    for directory, manifest_file_list in helm_manifest_files.items():
+        for manifest_file in manifest_file_list:
+            manifest_file_path = os.path.join(directory, manifest_file["manifest"])
+            # TODO: currently, only support one values file
+            values_file_path = os.path.join(directory, manifest_file["values"][0])
 
-        # helm consider null values to {}
-        if values is None:
-            values = {}
+            manifest = yaml.safe_load(open(manifest_file_path))
+            values = yaml.safe_load(open(values_file_path))
 
-        id_str = f'helm.{manifest["namespace"]}.{manifest["name"]}'
-        manifest_dict[id_str] = {
-            "chart": f'{manifest["chart"]["name"]}-{manifest["chart"]["version"]}',
-            "values_hash": _calc_helm_values_hash(values),
-            "_manifest_data": manifest,
-            "_values_data": values
-        }
+            # helm consider null values to {}
+            if values is None:
+                values = {}
+
+            id_str = f'helm.{manifest["namespace"]}.{manifest["name"]}'
+            manifest_dict[id_str] = {
+                "chart": f'{manifest["chart"]["name"]}-{manifest["chart"]["version"]}',
+                "values_hash": _calc_helm_values_hash(values),
+                "_manifest_data": manifest,
+                "_values_data": values
+            }
 
     return manifest_dict
 
