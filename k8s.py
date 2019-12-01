@@ -40,6 +40,9 @@ def _get_state(manifest):
 
 
 def _apply_manifest(manifest, filehash):
+    resource_id = _k8s_resource_id(manifest["metadata"])
+    logger.info(f"applying {resource_id}")
+
     if manifest["metadata"].get("annotations") is None:
         manifest["metadata"]["annotations"] = {}
     manifest["metadata"]["annotations"][LAST_APPLIED_KEY] = filehash
@@ -54,6 +57,8 @@ def _apply_manifest(manifest, filehash):
     _, errs, _ = utils.cmd_exec(cmd, stdin=yaml.dump(manifest).encode())
     if errs:
         logger.error(f"failed to execute kubectl apply, {errs}")
+    else:
+        logger.info(f"applied {resource_id}")
 
 
 def create_or_update(filepath):
@@ -63,9 +68,7 @@ def create_or_update(filepath):
     if state is not None and filehash == state["metadata"].get("annotations", {}).get(LAST_APPLIED_KEY):
         return
 
-    logger.info(f"applying {manifest['metadata']}")
     _apply_manifest(manifest, filehash)
-    logger.info(f"applied {manifest['metadata']}")
 
 
 def _k8s_resource_id(metadata):
