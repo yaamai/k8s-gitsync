@@ -7,16 +7,22 @@ import log
 
 logger = log.getLogger(__name__)
 
+KGS_MANAGED_KEY = "k8s-gitsync"
+
 
 def _calc_helm_values_hash(values_dict):
-    return hashlib.sha256(json.dumps(values_dict, sort_keys=True).encode()).hexdigest()
+    # deep clone and remove managed key
+    values = json.loads(json.dumps(values_dict))
+    values.pop(KGS_MANAGED_KEY, None)
+    json_str = json.dumps(values, sort_keys=True)
+    return hashlib.sha256(json_str.encode()).hexdigest()
 
 
-def _get_helm_values_hash(release_name):
+def _get_helm_values(release_name):
     cmd = ["./helm2/helm", "get", "values", release_name, "--output", "json"]
     outs, _, _ = utils.cmd_exec(cmd)
     values = json.loads(outs.decode())
-    return _calc_helm_values_hash(values)
+    return values
 
 
 def _get_helm_release_list():
@@ -45,17 +51,28 @@ def _upgrade_or_install_helm_release(release_name, namespace, version, chart_nam
     return json.loads(outs_json)
 
 
+def _delete_helm_release(release_name):
+    cmd = ["./helm2/helm", "delete", "--purge", release_name]
+    outs, _, _ = utils.cmd_exec(cmd)
+    return
+
+
 def get_helm_state():
     release_list = _get_helm_release_list()
     state = {}
     for e in release_list:
         state_id_str = f'helm.{e["Namespace"]}.{e["Name"]}'
-        state[state_id_str] = {"chart": e["Chart"], "values_hash": _get_helm_values_hash(e["Name"])}
+        values = _get_helm_values(e["Name"])
+        state[state_id_str] = {
+            "release_name": e["Name"],
+            "chart": e["Chart"],
+            "_values_data": values,
+            "values_hash": _calc_helm_values_hash(values)}
     return state
 
 
 def get_helm_manifest():
-    _, helm_manifest_files = utils.get_manifest_files("repo")
+    _, helm_manifest_files = utils.get_manifest_files("repo2")
 
     manifest_dict = {}
     for directory, manifest_files in helm_manifest_files.items():
@@ -94,7 +111,7 @@ def _hash_head(s):
     return s[:8]
 
 
-def compare_state_and_manifest(state_dict, manifest_dict):
+def _check_create_or_upgrade(state_dict, manifest_dict):
     for id_str, manifest in manifest_dict.items():
         logger.debug(f'Checking helm releases ...')
         logger.debug(f'  {id_str}:')
@@ -108,16 +125,38 @@ def compare_state_and_manifest(state_dict, manifest_dict):
             yield id_str, manifest['_manifest_data'], manifest['_values_data']
 
 
-def main():
-    state_dict = get_helm_state()
-    manifest_dict = get_helm_manifest()
-    for id_str, manifest, values in compare_state_and_manifest(state_dict, manifest_dict):
+def _check_delete(state_dict, manifest_dict):
+    for id_str, state in state_dict.items():
+        logger.debug(f'Checking helm releases ...')
+        logger.debug(f'  {id_str}:')
+        logger.debug(f"    managed       : {_safe_get(state, '_values_data', KGS_MANAGED_KEY, 'managed')}")
+        logger.debug(f'    need to delete: {id_str not in manifest_dict}')
+
+        if (_safe_get(state, '_values_data', KGS_MANAGED_KEY, 'managed') is True and
+                id_str not in manifest_dict):
+            yield id_str, state['release_name']
+
+
+def create_or_update(state_dict, manifest_dict):
+    for id_str, manifest, values in _check_create_or_upgrade(state_dict, manifest_dict):
+        values[KGS_MANAGED_KEY] = {"managed": True}
         _upgrade_or_install_helm_release(
             manifest['name'],
             manifest['namespace'],
             manifest['chart']['version'],
             manifest['chart']['name'],
             yaml.safe_dump(values).encode())
+
+
+def cleanup(state_dict, manifest_dict):
+    for id_str, release_name in _check_delete(state_dict, manifest_dict):
+        _delete_helm_release(release_name)
+
+
+def main():
+    state_dict = get_helm_state()
+    manifest_dict = get_helm_manifest()
+    cleanup(state_dict, manifest_dict)
 
 
 if __name__ == "__main__":
