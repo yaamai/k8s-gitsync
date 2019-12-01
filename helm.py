@@ -10,6 +10,49 @@ logger = log.getLogger(__name__)
 KGS_MANAGED_KEY = "k8s-gitsync"
 
 
+class HelmClient():
+    def __init__(self, helm_binary_path="helm"):
+        self.helm_binary_path = helm_binary_path
+
+    def get_values(self, release_name):
+        cmd = [self.helm_binary_path, "get", "values", release_name, "--output", "json"]
+        outs, _, _ = utils.cmd_exec(cmd)
+        values = json.loads(outs.decode())
+        return values
+
+    def get_release_list(self):
+        cmd = [self.helm_binary_path, "list", "--output", "json"]
+        outs, _, _ = utils.cmd_exec(cmd)
+
+        # if no release exists, helm return empty binary b''
+        if not outs:
+            return []
+
+        release_list = json.loads(outs.decode())
+        return release_list["Releases"]
+
+    def upgrade_install_release(self, release_name, namespace, version, chart_name, values):
+        cmd = [self.helm_binary_path, "upgrade",
+               "--output", "json",
+               "--install", release_name,
+               "--namespace", namespace,
+               "--values", "-",
+               "--version", version,
+               chart_name]
+        outs, _, _ = utils.cmd_exec(cmd, values)
+
+        # remove WARNING:, DEBUG: Release
+        warning_log_re = re.compile(r'^(WARNING:|DEBUG:|Release).*', re.MULTILINE)
+        outs_json = warning_log_re.sub("", outs.decode())
+
+        return json.loads(outs_json)
+
+    def delete_release(self, release_name):
+        cmd = [self.helm_binary_path, "delete", "--purge", release_name]
+        outs, _, _ = utils.cmd_exec(cmd)
+        return
+
+
 def _calc_helm_values_hash(values_dict):
     # deep clone and remove managed key
     values = json.loads(json.dumps(values_dict))
@@ -18,51 +61,28 @@ def _calc_helm_values_hash(values_dict):
     return hashlib.sha256(json_str.encode()).hexdigest()
 
 
-def _get_helm_values(release_name):
-    cmd = ["./helm2/helm", "get", "values", release_name, "--output", "json"]
-    outs, _, _ = utils.cmd_exec(cmd)
-    values = json.loads(outs.decode())
-    return values
+def _safe_get(d, *args):
+    r = d
+    for k in args:
+        if k not in r:
+            return "[UNKNOWN]"
+        r = r[k]
+    return r
 
 
-def _get_helm_release_list():
-    cmd = ["./helm2/helm", "list", "--output", "json"]
-    outs, _, _ = utils.cmd_exec(cmd)
-    if not outs:
-        return []
-    release_list = json.loads(outs.decode())
-    return release_list["Releases"]
+def _hash_head(s):
+    if s == "[UNKNOWN]":
+        return s
+
+    return s[:8]
 
 
-def _upgrade_or_install_helm_release(release_name, namespace, version, chart_name, values):
-    cmd = ["./helm2/helm", "upgrade",
-           "--output", "json",
-           "--install", release_name,
-           "--namespace", namespace,
-           "--values", "-",
-           "--version", version,
-           chart_name]
-    outs, _, _ = utils.cmd_exec(cmd, values)
-
-    # remove WARNING:
-    warning_log_re = re.compile(r'^(WARNING:|DEBUG:|Release).*', re.MULTILINE)
-    outs_json = warning_log_re.sub("", outs.decode())
-
-    return json.loads(outs_json)
-
-
-def _delete_helm_release(release_name):
-    cmd = ["./helm2/helm", "delete", "--purge", release_name]
-    outs, _, _ = utils.cmd_exec(cmd)
-    return
-
-
-def get_helm_state():
-    release_list = _get_helm_release_list()
+def _get_state(helm_client):
+    release_list = helm_client.get_release_list()
     state = {}
     for e in release_list:
         state_id_str = f'helm.{e["Namespace"]}.{e["Name"]}'
-        values = _get_helm_values(e["Name"])
+        values = helm_client.get_values(e["Name"])
         state[state_id_str] = {
             "release_name": e["Name"],
             "chart": e["Chart"],
@@ -71,9 +91,7 @@ def get_helm_state():
     return state
 
 
-def get_helm_manifest():
-    _, helm_manifest_files = utils.get_manifest_files("repo2")
-
+def _get_manifest(helm_manifest_files):
     manifest_dict = {}
     for directory, manifest_files in helm_manifest_files.items():
         manifest = yaml.safe_load(open(f'{directory}/{manifest_files["manifest"]}'))
@@ -93,22 +111,6 @@ def get_helm_manifest():
         }
 
     return manifest_dict
-
-
-def _safe_get(d, *args):
-    r = d
-    for k in args:
-        if k not in r:
-            return "[UNKNOWN]"
-        r = r[k]
-    return r
-
-
-def _hash_head(s):
-    if s == "[UNKNOWN]":
-        return s
-
-    return s[:8]
 
 
 def _check_create_or_upgrade(state_dict, manifest_dict):
@@ -137,10 +139,14 @@ def _check_delete(state_dict, manifest_dict):
             yield id_str, state['release_name']
 
 
-def create_or_update(state_dict, manifest_dict):
+def create_or_update(helm_manifest_files):
+    helm_client = HelmClient()
+    state_dict = _get_state(helm_client)
+    manifest_dict = _get_manifest(helm_manifest_files)
+
     for id_str, manifest, values in _check_create_or_upgrade(state_dict, manifest_dict):
         values[KGS_MANAGED_KEY] = {"managed": True}
-        _upgrade_or_install_helm_release(
+        helm_client.upgrade_install_release(
             manifest['name'],
             manifest['namespace'],
             manifest['chart']['version'],
@@ -148,16 +154,10 @@ def create_or_update(state_dict, manifest_dict):
             yaml.safe_dump(values).encode())
 
 
-def cleanup(state_dict, manifest_dict):
+def destroy_unless_exist_in(helm_manifest_files):
+    helm_client = HelmClient()
+    state_dict = _get_state(helm_client)
+    manifest_dict = _get_manifest(helm_manifest_files)
+
     for id_str, release_name in _check_delete(state_dict, manifest_dict):
-        _delete_helm_release(release_name)
-
-
-def main():
-    state_dict = get_helm_state()
-    manifest_dict = get_helm_manifest()
-    cleanup(state_dict, manifest_dict)
-
-
-if __name__ == "__main__":
-    main()
+        helm_client.delete_release(release_name)

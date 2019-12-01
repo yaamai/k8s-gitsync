@@ -2,6 +2,7 @@ import argparse
 import os.path
 import utils
 import k8s
+import helm
 
 
 def main():
@@ -17,6 +18,8 @@ def main():
         for manifest_dir, manifest_files in k8s_manifests.items():
             for manifest_file in manifest_files:
                 k8s.create_or_update(os.path.join(manifest_dir, manifest_file))
+
+        helm.create_or_update(helm_manifests)
     else:
         filepaths = []
         for manifest_dir, manifest_files in k8s_manifests.items():
@@ -24,6 +27,7 @@ def main():
                 filepaths.append(os.path.join(manifest_dir, manifest_file))
 
         k8s.destroy_unless_exist_in(filepaths)
+        helm.destroy_unless_exist_in(helm_manifests)
 
 
 if __name__ == "__main__":
