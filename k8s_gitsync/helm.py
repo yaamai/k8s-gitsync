@@ -39,14 +39,17 @@ class HelmV2Client():
 
         return [_rename_key(e) for e in release_list["Releases"]]
 
-    def upgrade_install_release(self, release_name, namespace, version, chart_name, values):
-        cmd = [self.helm_binary_path, "upgrade",
-               "--output", "json",
-               "--install", release_name,
-               "--namespace", namespace,
-               "--values", "-",
-               "--version", version,
-               chart_name]
+    def upgrade_install_release(self, release_name, namespace, version, repo, chart_name, values):
+        cmd = []
+        cmd += [self.helm_binary_path, "upgrade"]
+        cmd += ["--output", "json"]
+        cmd += ["--install", release_name]
+        cmd += ["--namespace", namespace]
+        cmd += ["--values", "-"]
+        cmd += ["--version", version]
+        if repo is not None and repo != "":
+            cmd += ["--repo", repo]
+        cmd += [chart_name]
         outs, _, _ = utils.cmd_exec(cmd, values)
 
         # remove WARNING:, DEBUG: Release
@@ -83,15 +86,19 @@ class HelmV3Client(HelmV2Client):
             return {}
         return values
 
-    def _install_release(self, release_name, namespace, version, chart_name, values):
+    def _install_release(self, release_name, namespace, version, repo, chart_name, values):
         self._ensure_namespace(namespace)
-        cmd = [self.helm_binary_path, "install",
-               release_name,
-               chart_name,
-               "--output", "json",
-               "--namespace", namespace,
-               "--version", version,
-               "--values", "-"]
+        cmd = []
+        cmd += [self.helm_binary_path, "install"]
+        cmd += [release_name]
+        cmd += [chart_name]
+        cmd += ["--output", "json"]
+        cmd += ["--namespace", namespace]
+        cmd += ["--version", version]
+        cmd += ["--values", "-"]
+        if repo is not None and repo != "":
+            cmd += ["--repo", repo]
+
         outs, _, _ = utils.cmd_exec(cmd, values)
 
         # remove WARNING:, DEBUG: Release
@@ -100,15 +107,18 @@ class HelmV3Client(HelmV2Client):
 
         return json.loads(outs_json)
 
-    def _upgrade_release(self, release_name, namespace, version, chart_name, values):
+    def _upgrade_release(self, release_name, namespace, version, repo, chart_name, values):
         self._ensure_namespace(namespace)
-        cmd = [self.helm_binary_path, "upgrade",
-               "--output", "json",
-               "--install", release_name,
-               "--namespace", namespace,
-               "--values", "-",
-               "--version", version,
-               chart_name]
+        cmd = []
+        cmd += [self.helm_binary_path, "upgrade"]
+        cmd += ["--output", "json"]
+        cmd += ["--install", release_name]
+        cmd += ["--namespace", namespace]
+        cmd += ["--values", "-"]
+        cmd += ["--version", version]
+        if repo is not None and repo != "":
+            cmd += ["--repo", repo]
+        cmd += [chart_name]
         outs, _, _ = utils.cmd_exec(cmd, values)
 
         # remove WARNING:, DEBUG: Release
@@ -124,13 +134,13 @@ class HelmV3Client(HelmV2Client):
                 return True
         return False
 
-    def upgrade_install_release(self, release_name, namespace, version, chart_name, values):
+    def upgrade_install_release(self, release_name, namespace, version, repo, chart_name, values):
         # check installed or not
-        # due to values from stdin not supported yet on v3.0.0 (#7002)
+        # because values from stdin not fully supported yet on v3.0.0 (#7002)
         if self._is_installed(release_name, namespace):
-            return self._upgrade_release(release_name, namespace, version, chart_name, values)
+            return self._upgrade_release(release_name, namespace, version, repo, chart_name, values)
         else:
-            return self._install_release(release_name, namespace, version, chart_name, values)
+            return self._install_release(release_name, namespace, version, repo, chart_name, values)
 
     def delete_release(self, namespace, release_name):
         cmd = [self.helm_binary_path, "delete", "-n", namespace, release_name]
@@ -161,8 +171,8 @@ class HelmClient():
     def get_release_list(self):
         return self.client.get_release_list()
 
-    def upgrade_install_release(self, release_name, namespace, version, chart_name, values):
-        return self.client.upgrade_install_release(release_name, namespace, version, chart_name, values)
+    def upgrade_install_release(self, release_name, namespace, version, repo, chart_name, values):
+        return self.client.upgrade_install_release(release_name, namespace, version, repo, chart_name, values)
 
     def delete_release(self, namespace, release_name):
         return self.client.delete_release(namespace, release_name)
@@ -207,16 +217,22 @@ def _get_state(helm_client):
     return state
 
 
+def _get_values(directory, value_files):
+    # TODO: currently, only support one values file
+    values = {}
+    if len(value_files) > 0:
+        values_file_path = os.path.join(directory, value_files[0])
+        values = yaml.safe_load(open(values_file_path))
+    return values
+
+
 def _get_manifest(helm_manifest_files):
     manifest_dict = {}
     for directory, manifest_file_list in helm_manifest_files.items():
         for manifest_file in manifest_file_list:
             manifest_file_path = os.path.join(directory, manifest_file["manifest"])
-            # TODO: currently, only support one values file
-            values_file_path = os.path.join(directory, manifest_file["values"][0])
-
             manifest = yaml.safe_load(open(manifest_file_path))
-            values = yaml.safe_load(open(values_file_path))
+            values = _get_values(directory, manifest_file["values"])
 
             # helm consider null values to {}
             if values is None:
@@ -270,6 +286,7 @@ def create_or_update(helm_manifest_files):
             manifest['name'],
             manifest['namespace'],
             manifest['chart']['version'],
+            manifest['chart']['repo'],
             manifest['chart']['name'],
             yaml.safe_dump(values).encode())
 
