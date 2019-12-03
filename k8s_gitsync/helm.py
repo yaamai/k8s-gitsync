@@ -83,7 +83,24 @@ class HelmV3Client(HelmV2Client):
             return {}
         return values
 
-    def upgrade_install_release(self, release_name, namespace, version, chart_name, values):
+    def _install_release(self, release_name, namespace, version, chart_name, values):
+        self._ensure_namespace(namespace)
+        cmd = [self.helm_binary_path, "install",
+               release_name,
+               chart_name,
+               "--output", "json",
+               "--namespace", namespace,
+               "--version", version,
+               "--values", "-"]
+        outs, _, _ = utils.cmd_exec(cmd, values)
+
+        # remove WARNING:, DEBUG: Release
+        warning_log_re = re.compile(r'^(WARNING:|DEBUG:|Release).*', re.MULTILINE)
+        outs_json = warning_log_re.sub("", outs.decode())
+
+        return json.loads(outs_json)
+
+    def _upgrade_release(self, release_name, namespace, version, chart_name, values):
         self._ensure_namespace(namespace)
         cmd = [self.helm_binary_path, "upgrade",
                "--output", "json",
@@ -94,14 +111,26 @@ class HelmV3Client(HelmV2Client):
                chart_name]
         outs, _, _ = utils.cmd_exec(cmd, values)
 
-        # To fix helm3 values error (first passed values ignored)
-        outs, _, _ = utils.cmd_exec(cmd, values)
-
         # remove WARNING:, DEBUG: Release
         warning_log_re = re.compile(r'^(WARNING:|DEBUG:|Release).*', re.MULTILINE)
         outs_json = warning_log_re.sub("", outs.decode())
 
         return json.loads(outs_json)
+
+    def _is_installed(self, release_name, namespace):
+        release_list = self.get_release_list()
+        for e in release_list:
+            if e["namespace"] == namespace and e["name"] == release_name:
+                return True
+        return False
+
+    def upgrade_install_release(self, release_name, namespace, version, chart_name, values):
+        # check installed or not
+        # due to values from stdin not supported yet on v3.0.0 (#7002)
+        if self._is_installed(release_name, namespace):
+            return self._upgrade_release(release_name, namespace, version, chart_name, values)
+        else:
+            return self._install_release(release_name, namespace, version, chart_name, values)
 
     def delete_release(self, namespace, release_name):
         cmd = [self.helm_binary_path, "delete", "-n", namespace, release_name]
