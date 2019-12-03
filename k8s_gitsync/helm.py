@@ -39,7 +39,7 @@ class HelmV2Client():
 
         return [_rename_key(e) for e in release_list["Releases"]]
 
-    def upgrade_install_release(self, release_name, namespace, version, repo, chart_name, values):
+    def upgrade_install_release(self, namespace, release_name, repo, chart_name, version, values):
         cmd = []
         cmd += [self.helm_binary_path, "upgrade"]
         cmd += ["--output", "json"]
@@ -86,7 +86,7 @@ class HelmV3Client(HelmV2Client):
             return {}
         return values
 
-    def _install_release(self, release_name, namespace, version, repo, chart_name, values):
+    def _install_release(self, namespace, release_name, repo, chart_name, version, values):
         self._ensure_namespace(namespace)
         cmd = []
         cmd += [self.helm_binary_path, "install"]
@@ -107,7 +107,7 @@ class HelmV3Client(HelmV2Client):
 
         return json.loads(outs_json)
 
-    def _upgrade_release(self, release_name, namespace, version, repo, chart_name, values):
+    def _upgrade_release(self, namespace, release_name, repo, chart_name, version, values):
         self._ensure_namespace(namespace)
         cmd = []
         cmd += [self.helm_binary_path, "upgrade"]
@@ -134,13 +134,13 @@ class HelmV3Client(HelmV2Client):
                 return True
         return False
 
-    def upgrade_install_release(self, release_name, namespace, version, repo, chart_name, values):
+    def upgrade_install_release(self, namespace, release_name, repo, chart_name, version, values):
         # check installed or not
         # because values from stdin not fully supported yet on v3.0.0 (#7002)
         if self._is_installed(release_name, namespace):
-            return self._upgrade_release(release_name, namespace, version, repo, chart_name, values)
+            return self._upgrade_release(namespace, release_name, repo, chart_name, version, values)
         else:
-            return self._install_release(release_name, namespace, version, repo, chart_name, values)
+            return self._install_release(namespace, release_name, repo, chart_name, version, values)
 
     def delete_release(self, namespace, release_name):
         cmd = [self.helm_binary_path, "delete", "-n", namespace, release_name]
@@ -171,8 +171,8 @@ class HelmClient():
     def get_release_list(self):
         return self.client.get_release_list()
 
-    def upgrade_install_release(self, release_name, namespace, version, repo, chart_name, values):
-        return self.client.upgrade_install_release(release_name, namespace, version, repo, chart_name, values)
+    def upgrade_install_release(self, namespace, release_name, repo, chart_name, version, values):
+        return self.client.upgrade_install_release(namespace, release_name, repo, chart_name, version, values)
 
     def delete_release(self, namespace, release_name):
         return self.client.delete_release(namespace, release_name)
@@ -186,17 +186,17 @@ def _calc_helm_values_hash(values_dict):
     return hashlib.sha256(json_str.encode()).hexdigest()
 
 
-def _safe_get(d, *args):
+def _safe_get(d, *args, default=None):
     r = d
     for k in args:
         if k not in r:
-            return "[UNKNOWN]"
+            return default
         r = r[k]
     return r
 
 
 def _hash_head(s):
-    if s == "[UNKNOWN]":
+    if s is None:
         return s
 
     return s[:8]
@@ -251,27 +251,33 @@ def _get_manifest(helm_manifest_files):
 
 def _check_create_or_upgrade(state_dict, manifest_dict):
     for id_str, manifest in manifest_dict.items():
+        is_not_installed = id_str not in state_dict
+        is_chart_mismatch = manifest['chart'] != _safe_get(state_dict, id_str, 'chart')
+        is_values_mismatch = manifest['values_hash'] != _safe_get(state_dict, id_str, 'values_hash')
+        need_process = (is_not_installed or is_chart_mismatch or is_values_mismatch)
+
         logger.debug(f'Checking helm releases ...')
-        logger.debug(f'  {id_str}:')
+        logger.info(f'  {id_str}: need install or upgrade {need_process}')
         logger.debug(f'    not installed: {id_str not in state_dict}')
         logger.debug(f'    chart ver    : {manifest["chart"]} <-> {_safe_get(state_dict, id_str, "chart")}')
         logger.debug(f'    values hash  : {_hash_head(manifest["values_hash"])}'
                      f' <-> {_hash_head(_safe_get(state_dict, id_str, "values_hash"))}')
-        if (id_str not in state_dict or
-                manifest['chart'] != state_dict[id_str]['chart'] or
-                manifest['values_hash'] != state_dict[id_str]['values_hash']):
+        if need_process:
             yield id_str, manifest['_manifest_data'], manifest['_values_data']
 
 
 def _check_delete(state_dict, manifest_dict):
     for id_str, state in state_dict.items():
+        is_managed_resource = _safe_get(state, '_values_data', KGS_MANAGED_KEY, 'managed') is True
+        is_deleted_in_manifest = id_str not in manifest_dict
+        need_process = (is_managed_resource and is_deleted_in_manifest)
+
         logger.debug(f'Checking helm releases ...')
-        logger.debug(f'  {id_str}:')
+        logger.info(f'  {id_str}: need delete {need_process}')
         logger.debug(f"    managed       : {_safe_get(state, '_values_data', KGS_MANAGED_KEY, 'managed')}")
         logger.debug(f'    need to delete: {id_str not in manifest_dict}')
 
-        if (_safe_get(state, '_values_data', KGS_MANAGED_KEY, 'managed') is True and
-                id_str not in manifest_dict):
+        if need_process:
             yield id_str, state['namespace'], state['release_name']
 
 
@@ -283,11 +289,11 @@ def create_or_update(helm_manifest_files):
     for id_str, manifest, values in _check_create_or_upgrade(state_dict, manifest_dict):
         values[KGS_MANAGED_KEY] = {"managed": True}
         helm_client.upgrade_install_release(
-            manifest['name'],
             manifest['namespace'],
-            manifest['chart']['version'],
+            manifest['name'],
             manifest['chart']['repo'],
             manifest['chart']['name'],
+            manifest['chart']['version'],
             yaml.safe_dump(values).encode())
 
 
