@@ -1,8 +1,8 @@
 import argparse
 import os.path
-import utils
-import k8s
-import helm
+from . import utils
+from . import k8s
+from . import helm
 
 
 def main():

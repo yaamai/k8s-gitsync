@@ -2,9 +2,9 @@ import re
 import yaml
 import json
 import hashlib
-import utils
-import log
 import os.path
+from . import utils
+from . import log
 
 logger = log.getLogger(__name__)
 

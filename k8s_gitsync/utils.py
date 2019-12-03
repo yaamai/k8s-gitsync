@@ -1,7 +1,7 @@
 import re
 import os
 from subprocess import Popen, PIPE
-import log
+from . import log
 
 logger = log.getLogger(__name__)
 

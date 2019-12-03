@@ -2,8 +2,8 @@ import json
 import yaml
 import hashlib
 from collections import defaultdict
-import log
-import utils
+from . import log
+from . import utils
 
 logger = log.getLogger(__name__)
 
