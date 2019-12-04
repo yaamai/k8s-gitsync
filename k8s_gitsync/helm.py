@@ -291,7 +291,7 @@ def create_or_update(helm_manifest_files):
         helm_client.upgrade_install_release(
             manifest['namespace'],
             manifest['name'],
-            manifest['chart']['repo'],
+            manifest['chart'].get('repo', None),
             manifest['chart']['name'],
             manifest['chart']['version'],
             yaml.safe_dump(values).encode())
