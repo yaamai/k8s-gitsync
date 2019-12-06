@@ -40,7 +40,7 @@ def _get_state(manifest):
 
 
 def _apply_manifest(manifest, filehash):
-    resource_id = _k8s_resource_id(manifest["metadata"])
+    resource_id = _k8s_resource_id(manifest["kind"], manifest["metadata"])
     logger.info(f"applying {resource_id}")
 
     if manifest["metadata"].get("annotations") is None:
@@ -71,43 +71,41 @@ def create_or_update(filepath):
     _apply_manifest(manifest, filehash)
 
 
-def _k8s_resource_id(metadata):
-    return f'{metadata["namespace"]}.{metadata["name"]}'
+def _k8s_resource_id(kind, metadata):
+    return f'{kind.lower()}.{metadata["namespace"]}.{metadata["name"]}'
 
 
 def destroy_unless_exist_in(manifest_filepaths):
-    manifest_ids_per_kind = defaultdict(list)
+    manifest_ids = []
     for filepath in manifest_filepaths:
         manifest, _ = _parse_manifest_file(filepath)
-        manifest_ids_per_kind[manifest["kind"].lower()].append(_k8s_resource_id(manifest["metadata"]))
-    logger.info(f"existing manifests: {dict(manifest_ids_per_kind)}")
+        manifest_ids.append(_k8s_resource_id(manifest["kind"], manifest["metadata"]))
+    logger.info(f"existing manifests: {manifest_ids}")
 
+    logger.info("fetching resouce kinds from k8s..")
     cmd = ["kubectl", "api-resources", "-o", "name"]
     outs, _, _ = utils.cmd_exec(cmd)
     kinds = outs.decode().split()
+    kinds_csv = ",".join(kinds)
+    logger.info("fetched resouce kinds from k8s.")
 
-    for kind in kinds:
-        cmd = ["kubectl", "get", kind, "--all-namespaces", "-l", KGS_MANAGED_KEY + "=true", "-o", "json"]
-        outs, errs, _ = utils.cmd_exec(cmd)
-        if errs:
-            if "NotFound" in errs.decode() or "MethodNotAllowed" in errs.decode():
-                logger.debug(f"k8s returned an ignorable error against retrieving states of {kind}")
-            else:
-                logger.error(f"failed to get k8s states: {errs.decode()}")
-            continue
+    logger.info("fetching all resources from k8s..")
+    cmd = ["kubectl", "get", kinds_csv, "--all-namespaces", "-l", KGS_MANAGED_KEY + "=true", "-o", "json"]
+    # NOTE: ignore stderr because it contains the messages that is output even when command does not fail.
+    outs, _, _ = utils.cmd_exec(cmd)
+    logger.info("fetched all resources from k8s.")
 
-        states = json.loads(outs.decode())["items"]
-        states = _filter_states_by_label(states, KGS_MANAGED_KEY, "true")
-        if len(states) != 0:
-            logger.info(f'existing states[{kind}]: {[_k8s_resource_id(s["metadata"]) for s in states]}')
+    states = json.loads(outs.decode())["items"]
+    states = _filter_states_by_label(states, KGS_MANAGED_KEY, "true")
+    logger.info(f'existing states: {[_k8s_resource_id(s["kind"], s["metadata"]) for s in states]}')
 
-        for state in states:
-            state_id = _k8s_resource_id(state["metadata"])
-            if state_id not in manifest_ids_per_kind[state["kind"].lower()]:
-                logger.info(f"{state_id} does not exist, it will be destroyed")
-                _delete_state(state)
-            else:
-                logger.debug(f"{state_id} exists")
+    for state in states:
+        state_id = _k8s_resource_id(state["kind"], state["metadata"])
+        if state_id not in manifest_ids:
+            logger.info(f"{state_id} does not exist, it will be destroyed")
+            _delete_state(state)
+        else:
+            logger.info(f"{state_id} exists")
 
 
 def _filter_states_by_label(states, labelkey, labelvalue):
@@ -129,7 +127,7 @@ def _filter_states_by_label(states, labelkey, labelvalue):
 
 
 def _delete_state(state):
-    resource_id = _k8s_resource_id(state["metadata"])
+    resource_id = _k8s_resource_id(state["kind"], state["metadata"])
     logger.info(f"deleting {resource_id}")
     cmd = ["kubectl", "-n", state["metadata"]["namespace"], "delete", state["kind"], state["metadata"]["name"]]
     _, errs, _ = utils.cmd_exec(cmd)
