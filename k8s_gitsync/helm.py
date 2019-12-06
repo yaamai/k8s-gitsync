@@ -39,7 +39,7 @@ class HelmV2Client():
 
         return [_rename_key(e) for e in release_list["Releases"]]
 
-    def upgrade_install_release(self, namespace, release_name, repo, chart_name, version, values):
+    def upgrade_install_release(self, namespace, release_name, repo, localpath, chart_name, version, values):
         cmd = []
         cmd += [self.helm_binary_path, "upgrade"]
         cmd += ["--output", "json"]
@@ -49,7 +49,10 @@ class HelmV2Client():
         cmd += ["--version", version]
         if repo is not None and repo != "":
             cmd += ["--repo", repo]
-        cmd += [chart_name]
+        if localpath is not None and localpath != "":
+            cmd += [f'{localpath}{chart_name}']
+        else:
+            cmd += [chart_name]
         outs, _, _ = utils.cmd_exec(cmd, values)
 
         # remove WARNING:, DEBUG: Release
@@ -86,12 +89,15 @@ class HelmV3Client(HelmV2Client):
             return {}
         return values
 
-    def _install_release(self, namespace, release_name, repo, chart_name, version, values):
+    def _install_release(self, namespace, release_name, repo, localpath, chart_name, version, values):
         self._ensure_namespace(namespace)
         cmd = []
         cmd += [self.helm_binary_path, "install"]
         cmd += [release_name]
-        cmd += [chart_name]
+        if localpath is not None and localpath != "":
+            cmd += [f'{localpath}{chart_name}']
+        else:
+            cmd += [chart_name]
         cmd += ["--output", "json"]
         cmd += ["--namespace", namespace]
         cmd += ["--version", version]
@@ -107,7 +113,7 @@ class HelmV3Client(HelmV2Client):
 
         return json.loads(outs_json)
 
-    def _upgrade_release(self, namespace, release_name, repo, chart_name, version, values):
+    def _upgrade_release(self, namespace, release_name, repo, localpath, chart_name, version, values):
         self._ensure_namespace(namespace)
         cmd = []
         cmd += [self.helm_binary_path, "upgrade"]
@@ -118,7 +124,10 @@ class HelmV3Client(HelmV2Client):
         cmd += ["--version", version]
         if repo is not None and repo != "":
             cmd += ["--repo", repo]
-        cmd += [chart_name]
+        if localpath is not None and localpath != "":
+            cmd += [f'{localpath}{chart_name}']
+        else:
+            cmd += [chart_name]
         outs, _, _ = utils.cmd_exec(cmd, values)
 
         # remove WARNING:, DEBUG: Release
@@ -134,13 +143,13 @@ class HelmV3Client(HelmV2Client):
                 return True
         return False
 
-    def upgrade_install_release(self, namespace, release_name, repo, chart_name, version, values):
+    def upgrade_install_release(self, namespace, release_name, repo, localpath, chart_name, version, values):
         # check installed or not
         # because values from stdin not fully supported yet on v3.0.0 (#7002)
         if self._is_installed(release_name, namespace):
-            return self._upgrade_release(namespace, release_name, repo, chart_name, version, values)
+            return self._upgrade_release(namespace, release_name, repo, localpath, chart_name, version, values)
         else:
-            return self._install_release(namespace, release_name, repo, chart_name, version, values)
+            return self._install_release(namespace, release_name, repo, localpath, chart_name, version, values)
 
     def delete_release(self, namespace, release_name):
         cmd = [self.helm_binary_path, "delete", "-n", namespace, release_name]
@@ -171,8 +180,8 @@ class HelmClient():
     def get_release_list(self):
         return self.client.get_release_list()
 
-    def upgrade_install_release(self, namespace, release_name, repo, chart_name, version, values):
-        return self.client.upgrade_install_release(namespace, release_name, repo, chart_name, version, values)
+    def upgrade_install_release(self, namespace, release_name, repo, localpath, chart_name, version, values):
+        return self.client.upgrade_install_release(namespace, release_name, repo, localpath, chart_name, version, values)
 
     def delete_release(self, namespace, release_name):
         return self.client.delete_release(namespace, release_name)
@@ -292,6 +301,7 @@ def create_or_update(helm_manifest_files):
             manifest['namespace'],
             manifest['name'],
             manifest['chart'].get('repo', None),
+            manifest['chart'].get('localpath', None),
             manifest['chart']['name'],
             manifest['chart']['version'],
             yaml.safe_dump(values).encode())
