@@ -10,7 +10,12 @@ def main():
     parser = argparse.ArgumentParser(description=cli_desc)
     parser.add_argument("repo", help="manifests repository directory")
     parser.add_argument("--clean", action="store_true", help="clean up the resources removed from manifests")
+    parser.add_argument("--bench-k8s-get", action="store_true", help="benchmark k8s get operation")
     conf = parser.parse_args()
+
+    if conf.bench_k8s_get:
+        k8s._measure_k8s_operation()
+        return
 
     k8s_manifests, helm_manifests = utils.get_manifest_files(conf.repo)
 

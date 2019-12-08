@@ -134,3 +134,24 @@ def _delete_state(state):
     if errs:
         logger.error(f"failed to delete {resource_id}: {errs.decode()}")
     logger.info(f"deleted {resource_id}")
+
+
+def _measure_k8s_operation():
+    import timeit
+    from pprint import pprint as pp
+
+    cmd = ["kubectl", "api-resources", "-o", "name"]
+    outs, _, _ = utils.cmd_exec(cmd)
+    kinds = outs.decode().split()
+
+    time_dict = {}
+    for kind in kinds:
+        setup = """
+from k8s_gitsync import utils
+cmd = ["kubectl", "get", "{}", "--all-namespaces", "-l", "{}" + "=true", "-o", "json"]
+        """.format(kind, KGS_MANAGED_KEY)
+        # NOTE: ignore stderr because it contains the messages that is output even when command does not fail.
+        t = timeit.timeit("utils.cmd_exec(cmd)", setup, number=5)
+        time_dict[kind] = t
+
+    pp(time_dict)
