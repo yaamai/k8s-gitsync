@@ -26,6 +26,9 @@ def pipeline(arch):
             "from_secret": "docker_password"
           },
           "repo": "yaamai/k8s-gitsync",
+          "build_args": [
+            "ARCH=" + arch
+          ],
           "auto_tag": True,
           "auto_tag_suffix": "${DRONE_STAGE_ARCH}"
         }
