@@ -181,7 +181,8 @@ class HelmClient():
         return self.client.get_release_list()
 
     def upgrade_install_release(self, namespace, release_name, repo, localpath, chart_name, version, values):
-        return self.client.upgrade_install_release(namespace, release_name, repo, localpath, chart_name, version, values)
+        return self.client.upgrade_install_release(
+                namespace, release_name, repo, localpath, chart_name, version, values)
 
     def delete_release(self, namespace, release_name):
         return self.client.delete_release(namespace, release_name)
@@ -290,27 +291,33 @@ def _check_delete(state_dict, manifest_dict):
             yield id_str, state['namespace'], state['release_name']
 
 
-def create_or_update(helm_manifest_files):
+def create_or_update(helm_manifest_files, is_dry_run):
     helm_client = HelmClient()
     state_dict = _get_state(helm_client)
     manifest_dict = _get_manifest(helm_manifest_files)
 
     for id_str, manifest, values in _check_create_or_upgrade(state_dict, manifest_dict):
         values[KGS_MANAGED_KEY] = {"managed": True}
-        helm_client.upgrade_install_release(
-            manifest['namespace'],
-            manifest['name'],
-            manifest['chart'].get('repo', None),
-            manifest['chart'].get('localpath', None),
-            manifest['chart']['name'],
-            manifest['chart']['version'],
-            yaml.safe_dump(values).encode())
+        if is_dry_run:
+            logger.info('skipping install or upgrade (dry-run)')
+        else:
+            helm_client.upgrade_install_release(
+                manifest['namespace'],
+                manifest['name'],
+                manifest['chart'].get('repo', None),
+                manifest['chart'].get('localpath', None),
+                manifest['chart']['name'],
+                manifest['chart']['version'],
+                yaml.safe_dump(values).encode())
 
 
-def destroy_unless_exist_in(helm_manifest_files):
+def destroy_unless_exist_in(helm_manifest_files, is_dry_run):
     helm_client = HelmClient()
     state_dict = _get_state(helm_client)
     manifest_dict = _get_manifest(helm_manifest_files)
 
     for id_str, namespace, release_name in _check_delete(state_dict, manifest_dict):
-        helm_client.delete_release(namespace, release_name)
+        if is_dry_run:
+            logger.info('skipping delete (dry-run)')
+        else:
+            helm_client.delete_release(namespace, release_name)

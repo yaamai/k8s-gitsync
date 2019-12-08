@@ -1,7 +1,6 @@
 import json
 import yaml
 import hashlib
-from collections import defaultdict
 from . import log
 from . import utils
 
@@ -61,21 +60,24 @@ def _apply_manifest(manifest, filehash):
         logger.info(f"applied {resource_id}")
 
 
-def create_or_update(filepath):
+def create_or_update(filepath, is_dry_run):
     manifest, filehash = _parse_manifest_file(filepath)
     state = _get_state(manifest)
 
     if state is not None and filehash == state["metadata"].get("annotations", {}).get(LAST_APPLIED_KEY):
         return
 
-    _apply_manifest(manifest, filehash)
+    if is_dry_run:
+        logger.info('skipping install or upgrade (dry-run)')
+    else:
+        _apply_manifest(manifest, filehash)
 
 
 def _k8s_resource_id(kind, metadata):
     return f'{kind.lower()}.{metadata["namespace"]}.{metadata["name"]}'
 
 
-def destroy_unless_exist_in(manifest_filepaths):
+def destroy_unless_exist_in(manifest_filepaths, is_dry_run):
     manifest_ids = []
     for filepath in manifest_filepaths:
         manifest, _ = _parse_manifest_file(filepath)
@@ -103,7 +105,10 @@ def destroy_unless_exist_in(manifest_filepaths):
         state_id = _k8s_resource_id(state["kind"], state["metadata"])
         if state_id not in manifest_ids:
             logger.info(f"{state_id} does not exist, it will be destroyed")
-            _delete_state(state)
+            if is_dry_run:
+                logger.info('skipping delete (dry-run)')
+            else:
+                _delete_state(state)
         else:
             logger.info(f"{state_id} exists")
 
