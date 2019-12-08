@@ -7,4 +7,5 @@ RUN apk add --update python3 curl &&\
     chmod +x linux-amd64/helm &&\
     chmod +x kubectl &&\
     mv linux-amd64/helm kubectl /usr/local/bin &&\
+    rm -rf helm.tar.gz linux-amd64/ &&\
     cd /work && python3 setup.py install
