@@ -36,8 +36,8 @@ def get_manifest_files(repo_dir):
         return [Resource("k8s", os.path.join(root, f)) for f in k8s_files]
 
     logger.info("begin to walk manifest directory.")
-    helm_manifest = {}
-    k8s_manifest = {}
+    helm_manifest = []
+    k8s_manifest = []
     for root, dirs, files in os.walk(repo_dir):
         logger.debug(f"{root}, {dirs}, {files}")
 

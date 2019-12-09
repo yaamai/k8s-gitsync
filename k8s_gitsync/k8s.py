@@ -55,12 +55,12 @@ def expand_multi_document_file(resource):
     with open(resource.manifest) as f:
         documents = yaml.safe_load_all(f)
 
-    resources = []
-    for document in documents:
-        r = Resource("k8s", resource.manifest)
-        r.content = document
-        r.hash = hashlib.sha256(yaml.dump(document).encode()).hexdigest()
-        resources.append(r)
+        resources = []
+        for document in documents:
+            r = Resource("k8s", resource.manifest)
+            r.content = document
+            r.hash = hashlib.sha256(yaml.dump(document).encode()).hexdigest()
+            resources.append(r)
 
     return resources
 
