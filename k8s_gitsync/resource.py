@@ -5,6 +5,7 @@ class Resource:
         self.values = kwargs.get("values", [])
         self.id = kwargs.get("id", None)
         self.content = kwargs.get("content", None)
+        self.hash = kwargs.get("hash", None)
         self.required = kwargs.get("required", [])
 
     def __str__(self):

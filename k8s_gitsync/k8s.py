@@ -1,8 +1,9 @@
 import json
 import yaml
 import hashlib
-from . import log
+from .resource import Resource
 from . import utils
+from . import log
 
 logger = log.getLogger(__name__)
 
@@ -13,16 +14,6 @@ KGS_MANAGED_KEY = "k8s-gitsync/managed"
 def _ensure_namespace(namespace):
     cmd = ["kubectl", "create", "namespace", namespace]
     utils.cmd_exec(cmd)
-
-
-def _parse_manifest_file(filepath):
-    with open(filepath) as f:
-        filecontent = f.read()
-
-    filehash = hashlib.sha256(filecontent.encode()).hexdigest()
-    manifest = yaml.safe_load(filecontent)
-
-    return (manifest, filehash)
 
 
 def _get_state(manifest):
@@ -60,17 +51,30 @@ def _apply_manifest(manifest, filehash):
         logger.info(f"applied {resource_id}")
 
 
-def create_or_update(resource, is_dry_run):
-    manifest, filehash = _parse_manifest_file(resource.manifest)
-    state = _get_state(manifest)
+def expand_multi_document_file(resource):
+    with open(resource.manifest) as f:
+        documents = yaml.safe_load_all(f)
 
-    if state is not None and filehash == state["metadata"].get("annotations", {}).get(LAST_APPLIED_KEY):
+    resources = []
+    for document in documents:
+        r = Resource("k8s", resource.manifest)
+        r.content = document
+        r.hash = hashlib.sha256(yaml.dump(document).encode()).hexdigest()
+        resources.append(r)
+
+    return resources
+
+
+def create_or_update(resource, is_dry_run):
+    state = _get_state(resource.content)
+
+    if state is not None and resource.hash == state["metadata"].get("annotations", {}).get(LAST_APPLIED_KEY):
         return
 
     if is_dry_run:
         logger.info("skipping install or upgrade (dry-run)")
     else:
-        _apply_manifest(manifest, filehash)
+        _apply_manifest(resource.content, resource.hash)
 
 
 def _k8s_resource_id(kind, metadata):
@@ -80,8 +84,7 @@ def _k8s_resource_id(kind, metadata):
 def destroy_unless_exist_in(resources, is_dry_run):
     manifest_ids = []
     for resource in resources:
-        manifest, _ = _parse_manifest_file(resource.manifest)
-        manifest_ids.append(_k8s_resource_id(manifest["kind"], manifest["metadata"]))
+        manifest_ids.append(_k8s_resource_id(resource.content["kind"], resource.content["metadata"]))
     logger.info(f"existing manifests: {manifest_ids}")
 
     logger.info("fetching resource kinds from k8s..")

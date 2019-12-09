@@ -22,6 +22,13 @@ def main():
 
     resources = utils.get_manifest_files(conf.repo)
 
+    expanded_resources = []
+    for resource in resources:
+        if resource.applier == "k8s":
+            expanded_resources.extend(k8s.expand_multi_document_file(resource))
+    expanded_resources.extend(list(filter(lambda r: r.applier == "helm", resources)))
+    resources = expanded_resources
+
     if not conf.clean:
         for resource in resources:
             if resource.applier == "k8s":
