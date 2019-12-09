@@ -60,15 +60,15 @@ def _apply_manifest(manifest, filehash):
         logger.info(f"applied {resource_id}")
 
 
-def create_or_update(filepath, is_dry_run):
-    manifest, filehash = _parse_manifest_file(filepath)
+def create_or_update(resource, is_dry_run):
+    manifest, filehash = _parse_manifest_file(resource.manifest)
     state = _get_state(manifest)
 
     if state is not None and filehash == state["metadata"].get("annotations", {}).get(LAST_APPLIED_KEY):
         return
 
     if is_dry_run:
-        logger.info('skipping install or upgrade (dry-run)')
+        logger.info("skipping install or upgrade (dry-run)")
     else:
         _apply_manifest(manifest, filehash)
 
@@ -77,19 +77,19 @@ def _k8s_resource_id(kind, metadata):
     return f'{kind.lower()}.{metadata["namespace"]}.{metadata["name"]}'
 
 
-def destroy_unless_exist_in(manifest_filepaths, is_dry_run):
+def destroy_unless_exist_in(resources, is_dry_run):
     manifest_ids = []
-    for filepath in manifest_filepaths:
-        manifest, _ = _parse_manifest_file(filepath)
+    for resource in resources:
+        manifest, _ = _parse_manifest_file(resource.manifest)
         manifest_ids.append(_k8s_resource_id(manifest["kind"], manifest["metadata"]))
     logger.info(f"existing manifests: {manifest_ids}")
 
-    logger.info("fetching resouce kinds from k8s..")
+    logger.info("fetching resource kinds from k8s..")
     cmd = ["kubectl", "api-resources", "-o", "name"]
     outs, _, _ = utils.cmd_exec(cmd)
     kinds = outs.decode().split()
     kinds_csv = ",".join(kinds)
-    logger.info("fetched resouce kinds from k8s.")
+    logger.info("fetched resource kinds from k8s.")
 
     logger.info("fetching all resources from k8s..")
     cmd = ["kubectl", "get", kinds_csv, "--all-namespaces", "-l", KGS_MANAGED_KEY + "=true", "-o", "json"]
@@ -106,7 +106,7 @@ def destroy_unless_exist_in(manifest_filepaths, is_dry_run):
         if state_id not in manifest_ids:
             logger.info(f"{state_id} does not exist, it will be destroyed")
             if is_dry_run:
-                logger.info('skipping delete (dry-run)')
+                logger.info("skipping delete (dry-run)")
             else:
                 _delete_state(state)
         else:
@@ -154,7 +154,9 @@ def _measure_k8s_operation():
         setup = """
 from k8s_gitsync import utils
 cmd = ["kubectl", "get", "{}", "--all-namespaces", "-l", "{}" + "=true", "-o", "json"]
-        """.format(kind, KGS_MANAGED_KEY)
+        """.format(
+            kind, KGS_MANAGED_KEY
+        )
         # NOTE: ignore stderr because it contains the messages that is output even when command does not fail.
         t = timeit.timeit("utils.cmd_exec(cmd)", setup, number=5)
         time_dict[kind] = t

@@ -2,7 +2,6 @@ import re
 import yaml
 import json
 import hashlib
-import os.path
 from . import utils
 from . import log
 
@@ -11,7 +10,7 @@ logger = log.getLogger(__name__)
 KGS_MANAGED_KEY = "k8s-gitsync"
 
 
-class HelmV2Client():
+class HelmV2Client:
     def __init__(self, helm_binary_path="./helm3/helm"):
         self.helm_binary_path = helm_binary_path
 
@@ -50,13 +49,13 @@ class HelmV2Client():
         if repo is not None and repo != "":
             cmd += ["--repo", repo]
         if localpath is not None and localpath != "":
-            cmd += [f'{localpath}{chart_name}']
+            cmd += [f"{localpath}{chart_name}"]
         else:
             cmd += [chart_name]
         outs, _, _ = utils.cmd_exec(cmd, values)
 
         # remove WARNING:, DEBUG: Release
-        warning_log_re = re.compile(r'^(WARNING:|DEBUG:|Release).*', re.MULTILINE)
+        warning_log_re = re.compile(r"^(WARNING:|DEBUG:|Release).*", re.MULTILINE)
         outs_json = warning_log_re.sub("", outs.decode())
 
         return json.loads(outs_json)
@@ -95,7 +94,7 @@ class HelmV3Client(HelmV2Client):
         cmd += [self.helm_binary_path, "install"]
         cmd += [release_name]
         if localpath is not None and localpath != "":
-            cmd += [f'{localpath}{chart_name}']
+            cmd += [f"{localpath}{chart_name}"]
         else:
             cmd += [chart_name]
         cmd += ["--output", "json"]
@@ -108,7 +107,7 @@ class HelmV3Client(HelmV2Client):
         outs, _, _ = utils.cmd_exec(cmd, values)
 
         # remove WARNING:, DEBUG: Release
-        warning_log_re = re.compile(r'^(WARNING:|DEBUG:|Release).*', re.MULTILINE)
+        warning_log_re = re.compile(r"^(WARNING:|DEBUG:|Release).*", re.MULTILINE)
         outs_json = warning_log_re.sub("", outs.decode())
 
         return json.loads(outs_json)
@@ -125,13 +124,13 @@ class HelmV3Client(HelmV2Client):
         if repo is not None and repo != "":
             cmd += ["--repo", repo]
         if localpath is not None and localpath != "":
-            cmd += [f'{localpath}{chart_name}']
+            cmd += [f"{localpath}{chart_name}"]
         else:
             cmd += [chart_name]
         outs, _, _ = utils.cmd_exec(cmd, values)
 
         # remove WARNING:, DEBUG: Release
-        warning_log_re = re.compile(r'^(WARNING:|DEBUG:|Release).*', re.MULTILINE)
+        warning_log_re = re.compile(r"^(WARNING:|DEBUG:|Release).*", re.MULTILINE)
         outs_json = warning_log_re.sub("", outs.decode())
 
         return json.loads(outs_json)
@@ -157,7 +156,7 @@ class HelmV3Client(HelmV2Client):
         return
 
 
-class HelmClient():
+class HelmClient:
     def __init__(self, helm_binary_path="helm"):
         self.helm_binary_path = helm_binary_path
 
@@ -168,7 +167,7 @@ class HelmClient():
             self.client = HelmV3Client(self.helm_binary_path)
 
     def _get_helm_version(self):
-        version_re = re.compile(r'.*v([0-9]+)\.([0-9]+)\.([0-9]+).*')
+        version_re = re.compile(r".*v([0-9]+)\.([0-9]+)\.([0-9]+).*")
         cmd = [self.helm_binary_path, "version", "-c", "--short"]
         outs, _, _ = utils.cmd_exec(cmd)
         m = version_re.match(outs.decode())
@@ -182,7 +181,8 @@ class HelmClient():
 
     def upgrade_install_release(self, namespace, release_name, repo, localpath, chart_name, version, values):
         return self.client.upgrade_install_release(
-                namespace, release_name, repo, localpath, chart_name, version, values)
+            namespace, release_name, repo, localpath, chart_name, version, values
+        )
 
     def delete_release(self, namespace, release_name):
         return self.client.delete_release(namespace, release_name)
@@ -223,101 +223,99 @@ def _get_state(helm_client):
             "chart": e["chart"],
             "namespace": e["namespace"],
             "_values_data": values,
-            "values_hash": _calc_helm_values_hash(values)}
+            "values_hash": _calc_helm_values_hash(values),
+        }
     return state
 
 
-def _get_values(directory, value_files):
+def _get_values(value_files):
     # TODO: currently, only support one values file
-    values = {}
-    if len(value_files) > 0:
-        values_file_path = os.path.join(directory, value_files[0])
-        values = yaml.safe_load(open(values_file_path))
-    return values
+    if len(value_files) != 1:
+        return {}
+    else:
+        return yaml.safe_load(open(value_files[0]))
 
 
-def _get_manifest(helm_manifest_files):
-    manifest_dict = {}
-    for directory, manifest_file_list in helm_manifest_files.items():
-        for manifest_file in manifest_file_list:
-            manifest_file_path = os.path.join(directory, manifest_file["manifest"])
-            manifest = yaml.safe_load(open(manifest_file_path))
-            values = _get_values(directory, manifest_file["values"])
+def _get_manifest(resource):
+    manifest = yaml.safe_load(open(resource.manifest))
+    values = _get_values(resource.values)
 
-            # helm consider null values to {}
-            if values is None:
-                values = {}
-
-            id_str = f'helm.{manifest["namespace"]}.{manifest["name"]}'
-            manifest_dict[id_str] = {
-                "chart": f'{manifest["chart"]["name"]}-{manifest["chart"]["version"]}',
-                "values_hash": _calc_helm_values_hash(values),
-                "_manifest_data": manifest,
-                "_values_data": values
-            }
-
-    return manifest_dict
+    id_str = f'helm.{manifest["namespace"]}.{manifest["name"]}'
+    return {
+        "id": id_str,
+        "chart": f'{manifest["chart"]["name"]}-{manifest["chart"]["version"]}',
+        "values_hash": _calc_helm_values_hash(values),
+        "_manifest_data": manifest,
+        "_values_data": values,
+    }
 
 
 def _check_create_or_upgrade(state_dict, manifest_dict):
-    for id_str, manifest in manifest_dict.items():
-        is_not_installed = id_str not in state_dict
-        is_chart_mismatch = manifest['chart'] != _safe_get(state_dict, id_str, 'chart')
-        is_values_mismatch = manifest['values_hash'] != _safe_get(state_dict, id_str, 'values_hash')
-        need_process = (is_not_installed or is_chart_mismatch or is_values_mismatch)
+    id_str = manifest_dict["id"]
 
-        logger.debug(f'Checking helm releases ...')
-        logger.info(f'  {id_str}: need install or upgrade {need_process}')
-        logger.debug(f'    not installed: {id_str not in state_dict}')
-        logger.debug(f'    chart ver    : {manifest["chart"]} <-> {_safe_get(state_dict, id_str, "chart")}')
-        logger.debug(f'    values hash  : {_hash_head(manifest["values_hash"])}'
-                     f' <-> {_hash_head(_safe_get(state_dict, id_str, "values_hash"))}')
-        if need_process:
-            yield id_str, manifest['_manifest_data'], manifest['_values_data']
+    is_not_installed = id_str not in state_dict
+    is_chart_mismatch = manifest_dict["chart"] != _safe_get(state_dict, id_str, "chart")
+    is_values_mismatch = manifest_dict["values_hash"] != _safe_get(state_dict, id_str, "values_hash")
+    need_process = is_not_installed or is_chart_mismatch or is_values_mismatch
+
+    logger.debug(f"Checking helm releases ...")
+    logger.info(f"  {id_str}: need install or upgrade {need_process}")
+    logger.debug(f"    not installed: {id_str not in state_dict}")
+    logger.debug(f'    chart ver    : {manifest_dict["chart"]} <-> {_safe_get(state_dict, id_str, "chart")}')
+    logger.debug(
+        f'    values hash  : {_hash_head(manifest_dict["values_hash"])}'
+        f' <-> {_hash_head(_safe_get(state_dict, id_str, "values_hash"))}'
+    )
+    return need_process
 
 
 def _check_delete(state_dict, manifest_dict):
     for id_str, state in state_dict.items():
-        is_managed_resource = _safe_get(state, '_values_data', KGS_MANAGED_KEY, 'managed') is True
+        is_managed_resource = _safe_get(state, "_values_data", KGS_MANAGED_KEY, "managed") is True
         is_deleted_in_manifest = id_str not in manifest_dict
-        need_process = (is_managed_resource and is_deleted_in_manifest)
+        need_process = is_managed_resource and is_deleted_in_manifest
 
-        logger.debug(f'Checking helm releases ...')
-        logger.info(f'  {id_str}: need delete {need_process}')
+        logger.debug(f"Checking helm releases ...")
+        logger.info(f"  {id_str}: need delete {need_process}")
         logger.debug(f"    managed       : {_safe_get(state, '_values_data', KGS_MANAGED_KEY, 'managed')}")
-        logger.debug(f'    need to delete: {id_str not in manifest_dict}')
+        logger.debug(f"    need to delete: {id_str not in manifest_dict}")
 
         if need_process:
-            yield id_str, state['namespace'], state['release_name']
+            yield id_str, state["namespace"], state["release_name"]
 
 
-def create_or_update(helm_manifest_files, is_dry_run):
+def create_or_update(resource, is_dry_run):
     helm_client = HelmClient()
     state_dict = _get_state(helm_client)
-    manifest_dict = _get_manifest(helm_manifest_files)
+    manifest_dict = _get_manifest(resource)
 
-    for id_str, manifest, values in _check_create_or_upgrade(state_dict, manifest_dict):
+    if _check_create_or_upgrade(state_dict, manifest_dict):
+        manifest = manifest_dict["_manifest_data"]
+        values = manifest_dict["_values_data"]
+
         values[KGS_MANAGED_KEY] = {"managed": True}
         if is_dry_run:
-            logger.info('skipping install or upgrade (dry-run)')
+            logger.info("skipping install or upgrade (dry-run)")
         else:
             helm_client.upgrade_install_release(
-                manifest['namespace'],
-                manifest['name'],
-                manifest['chart'].get('repo', None),
-                manifest['chart'].get('localpath', None),
-                manifest['chart']['name'],
-                manifest['chart']['version'],
-                yaml.safe_dump(values).encode())
+                manifest["namespace"],
+                manifest["name"],
+                manifest["chart"].get("repo", None),
+                manifest["chart"].get("localpath", None),
+                manifest["chart"]["name"],
+                manifest["chart"]["version"],
+                yaml.safe_dump(values).encode(),
+            )
 
 
-def destroy_unless_exist_in(helm_manifest_files, is_dry_run):
+def destroy_unless_exist_in(resources, is_dry_run):
     helm_client = HelmClient()
     state_dict = _get_state(helm_client)
-    manifest_dict = _get_manifest(helm_manifest_files)
+    manifests = [_get_manifest(r) for r in resources]
+    manifest_dict = {m["id"]: m for m in manifests}
 
     for id_str, namespace, release_name in _check_delete(state_dict, manifest_dict):
         if is_dry_run:
-            logger.info('skipping delete (dry-run)')
+            logger.info("skipping delete (dry-run)")
         else:
             helm_client.delete_release(namespace, release_name)
