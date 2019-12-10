@@ -9,6 +9,7 @@ logger = log.getLogger(__name__)
 
 LAST_APPLIED_KEY = "k8s-gitsync/last-applied-confighash"
 KGS_MANAGED_KEY = "k8s-gitsync/managed"
+KGS_REQUIRES_KEY = "k8s-gitsync/requires"
 
 
 def _ensure_namespace(namespace):
@@ -60,6 +61,10 @@ def expand_multi_document_file(resource):
             r = Resource("k8s", resource.manifest)
             r.content = document
             r.hash = hashlib.sha256(yaml.dump(document).encode()).hexdigest()
+            r.id = _k8s_resource_id(r.content["kind"], r.content["metadata"])
+            requires = r.content["metadata"].get("annotations", {}).get(KGS_REQUIRES_KEY)
+            if requires:
+                r.requires = set(requires.split(","))
             resources.append(r)
 
     return resources
@@ -156,7 +161,8 @@ def _measure_k8s_operation():
     for kind in kinds:
         setup = """
 from k8s_gitsync import utils
-cmd = ["kubectl", "get", "{}", "--all-namespaces", "-l", "{}" + "=true", "-o", "json"]
+cmd = ["kubectl", "get", "{}", "--all-namespaces",
+    "-l", "{}" + "=true", "-o", "json"]
         """.format(
             kind, KGS_MANAGED_KEY
         )

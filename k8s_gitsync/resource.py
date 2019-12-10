@@ -3,10 +3,10 @@ class Resource:
         self.applier = applier
         self.manifest = manifest
         self.values = kwargs.get("values", [])
-        self.id = kwargs.get("id", None)
         self.content = kwargs.get("content", None)
         self.hash = kwargs.get("hash", None)
-        self.required = kwargs.get("required", [])
+        self.id = kwargs.get("id", None)
+        self.requires = kwargs.get("requires", set())
 
     def __str__(self):
         return str(self.__dict__)

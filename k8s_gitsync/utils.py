@@ -1,5 +1,6 @@
 import re
 import os
+from copy import deepcopy
 from subprocess import Popen, PIPE
 from .resource import Resource
 from . import log
