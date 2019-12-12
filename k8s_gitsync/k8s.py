@@ -59,6 +59,10 @@ def expand_multi_document_file(resource):
 
         resources = []
         for document in documents:
+            # some k8s manifest has empty document
+            if document is None:
+                continue
+            print(resource)
             r = Resource("k8s", resource.manifest)
             r.content = document
             r.hash = hashlib.sha256(yaml.dump(document).encode()).hexdigest()
