@@ -31,7 +31,8 @@ def main():
     for resource in resources:
         if resource.applier == "k8s":
             expanded_resources.extend(k8s.expand_multi_document_file(resource))
-    expanded_resources.extend(list(filter(lambda r: r.applier == "helm", resources)))
+        if resource.applier == "helm":
+            expanded_resources.extend(helm.expand(resource))
     resources = expanded_resources
 
     # preload helm manifests
@@ -57,7 +58,7 @@ def main():
         for resource in resources:
             if resource.applier == "k8s":
                 k8s.create_or_update(resource, conf.dry_run)
-            elif resources.applier == "helm":
+            elif resource.applier == "helm":
                 helm.create_or_update(resource, conf.dry_run)
             else:
                 logger.error(f"unknown resource applier: {resource.applier}")
