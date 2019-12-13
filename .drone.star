@@ -52,7 +52,7 @@ def docker_manifest():
             "from_secret": "docker_password"
           },
           "target": "yaamai/k8s-gitsync:${DRONE_COMMIT_SHA:0:8}",
-          "template": "yaamai/k8s-gitsync:ARCH",
+          "template": "yaamai/k8s-gitsync:${DRONE_COMMIT_SHA:0:8}-ARCH",
           "platforms": [
             "linux/amd64",
             "linux/arm",
