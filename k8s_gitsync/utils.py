@@ -2,10 +2,27 @@ import re
 import os
 from glob import glob
 from subprocess import Popen, PIPE
+from pathlib import Path
 from .resource import Resource
 from . import log
 
 logger = log.getLogger(__name__)
+
+
+def filter_directory_contains_file(files, pattern):
+    pattern_re = re.compile(pattern)
+    path_list = list(map(Path, files))
+    contains_dir_list = [p for p in path_list if pattern_re.match(p.name)]
+    print(contains_dir_list)
+
+    result = []
+    for path in path_list:
+        is_path_contain_file = [contains_dir.parent in path.parents for contains_dir in contains_dir_list]
+        print(path, is_path_contain_file)
+        if not any(is_path_contain_file):
+            result.append(str(path))
+
+    return result
 
 
 def get_manifest_files(repo_dir):
@@ -38,6 +55,8 @@ def get_manifest_files(repo_dir):
     logger.info(f"begin to walk manifest from {path}")
     files = glob(path, recursive=True)
     logger.info(f"  target files: {files}")
+
+    files = filter_directory_contains_file(files, "Chart\.yaml")
 
     files[:], helm_manifest = _get_helm_file(files)
     files[:], k8s_manifest = _get_k8s_file(files)
