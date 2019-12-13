@@ -1,8 +1,9 @@
 import json
 import yaml
 import hashlib
-from . import log
+from .resource import Resource
 from . import utils
+from . import log
 
 logger = log.getLogger(__name__)
 
@@ -13,16 +14,6 @@ KGS_MANAGED_KEY = "k8s-gitsync/managed"
 def _ensure_namespace(namespace):
     cmd = ["kubectl", "create", "namespace", namespace]
     utils.cmd_exec(cmd)
-
-
-def _parse_manifest_file(filepath):
-    with open(filepath) as f:
-        filecontent = f.read()
-
-    filehash = hashlib.sha256(filecontent.encode()).hexdigest()
-    manifest = yaml.safe_load(filecontent)
-
-    return (manifest, filehash)
 
 
 def _get_state(manifest):
@@ -60,36 +51,48 @@ def _apply_manifest(manifest, filehash):
         logger.info(f"applied {resource_id}")
 
 
-def create_or_update(filepath, is_dry_run):
-    manifest, filehash = _parse_manifest_file(filepath)
-    state = _get_state(manifest)
+def expand_multi_document_file(resource):
+    with open(resource.manifest) as f:
+        documents = yaml.safe_load_all(f)
 
-    if state is not None and filehash == state["metadata"].get("annotations", {}).get(LAST_APPLIED_KEY):
+        resources = []
+        for document in documents:
+            r = Resource("k8s", resource.manifest)
+            r.content = document
+            r.hash = hashlib.sha256(yaml.dump(document).encode()).hexdigest()
+            resources.append(r)
+
+    return resources
+
+
+def create_or_update(resource, is_dry_run):
+    state = _get_state(resource.content)
+
+    if state is not None and resource.hash == state["metadata"].get("annotations", {}).get(LAST_APPLIED_KEY):
         return
 
     if is_dry_run:
-        logger.info('skipping install or upgrade (dry-run)')
+        logger.info("skipping install or upgrade (dry-run)")
     else:
-        _apply_manifest(manifest, filehash)
+        _apply_manifest(resource.content, resource.hash)
 
 
 def _k8s_resource_id(kind, metadata):
     return f'{kind.lower()}.{metadata["namespace"]}.{metadata["name"]}'
 
 
-def destroy_unless_exist_in(manifest_filepaths, is_dry_run):
+def destroy_unless_exist_in(resources, is_dry_run):
     manifest_ids = []
-    for filepath in manifest_filepaths:
-        manifest, _ = _parse_manifest_file(filepath)
-        manifest_ids.append(_k8s_resource_id(manifest["kind"], manifest["metadata"]))
+    for resource in resources:
+        manifest_ids.append(_k8s_resource_id(resource.content["kind"], resource.content["metadata"]))
     logger.info(f"existing manifests: {manifest_ids}")
 
-    logger.info("fetching resouce kinds from k8s..")
+    logger.info("fetching resource kinds from k8s..")
     cmd = ["kubectl", "api-resources", "-o", "name"]
     outs, _, _ = utils.cmd_exec(cmd)
     kinds = outs.decode().split()
     kinds_csv = ",".join(kinds)
-    logger.info("fetched resouce kinds from k8s.")
+    logger.info("fetched resource kinds from k8s.")
 
     logger.info("fetching all resources from k8s..")
     cmd = ["kubectl", "get", kinds_csv, "--all-namespaces", "-l", KGS_MANAGED_KEY + "=true", "-o", "json"]
@@ -106,7 +109,7 @@ def destroy_unless_exist_in(manifest_filepaths, is_dry_run):
         if state_id not in manifest_ids:
             logger.info(f"{state_id} does not exist, it will be destroyed")
             if is_dry_run:
-                logger.info('skipping delete (dry-run)')
+                logger.info("skipping delete (dry-run)")
             else:
                 _delete_state(state)
         else:
@@ -154,7 +157,9 @@ def _measure_k8s_operation():
         setup = """
 from k8s_gitsync import utils
 cmd = ["kubectl", "get", "{}", "--all-namespaces", "-l", "{}" + "=true", "-o", "json"]
-        """.format(kind, KGS_MANAGED_KEY)
+        """.format(
+            kind, KGS_MANAGED_KEY
+        )
         # NOTE: ignore stderr because it contains the messages that is output even when command does not fail.
         t = timeit.timeit("utils.cmd_exec(cmd)", setup, number=5)
         time_dict[kind] = t
