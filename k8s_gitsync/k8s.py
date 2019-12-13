@@ -81,8 +81,10 @@ def create_or_update(resource, is_dry_run):
     if state is not None and resource.hash == state["metadata"].get("annotations", {}).get(LAST_APPLIED_KEY):
         return
 
+    logger.info(f"{resource.id}: it will be installed or upgrade")
+
     if is_dry_run:
-        logger.info("skipping install or upgrade (dry-run)")
+        logger.info("skipping install or upgrade a k8s resource (dry-run)")
     else:
         _apply_manifest(resource.content, resource.hash)
 
@@ -119,7 +121,7 @@ def destroy_unless_exist_in(resources, is_dry_run):
         if state_id not in manifest_ids:
             logger.info(f"{state_id} does not exist, it will be destroyed")
             if is_dry_run:
-                logger.info("skipping delete (dry-run)")
+                logger.info("skipping delete a k8s resource (dry-run)")
             else:
                 _delete_state(state)
         else:

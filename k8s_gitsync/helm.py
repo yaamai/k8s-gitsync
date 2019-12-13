@@ -258,7 +258,7 @@ def _check_create_or_upgrade(state_dict, manifest_dict):
     is_values_mismatch = manifest_dict["values_hash"] != _safe_get(state_dict, id_str, "values_hash")
     need_process = is_not_installed or is_chart_mismatch or is_values_mismatch
 
-    logger.debug(f"Checking helm releases ...")
+    logger.info(f"Checking helm releases ...")
     logger.info(f"  {id_str}: need install or upgrade {need_process}")
     logger.debug(f"    not installed: {id_str not in state_dict}")
     logger.debug(f'    chart ver    : {manifest_dict["chart"]} <-> {_safe_get(state_dict, id_str, "chart")}')
@@ -275,7 +275,7 @@ def _check_delete(state_dict, manifest_dict):
         is_deleted_in_manifest = id_str not in manifest_dict
         need_process = is_managed_resource and is_deleted_in_manifest
 
-        logger.debug(f"Checking helm releases ...")
+        logger.info(f"Checking helm releases ...")
         logger.info(f"  {id_str}: need delete {need_process}")
         logger.debug(f"    managed       : {_safe_get(state, '_values_data', KGS_MANAGED_KEY, 'managed')}")
         logger.debug(f"    need to delete: {id_str not in manifest_dict}")
@@ -295,7 +295,7 @@ def create_or_update(resource, is_dry_run):
 
         values[KGS_MANAGED_KEY] = {"managed": True}
         if is_dry_run:
-            logger.info("skipping install or upgrade (dry-run)")
+            logger.info("skipping install or upgrade a helm chart (dry-run)")
         else:
             helm_client.upgrade_install_release(
                 manifest["namespace"],
@@ -316,7 +316,7 @@ def destroy_unless_exist_in(resources, is_dry_run):
 
     for id_str, namespace, release_name in _check_delete(state_dict, manifest_dict):
         if is_dry_run:
-            logger.info("skipping delete (dry-run)")
+            logger.info("skipping delete a helm chart (dry-run)")
         else:
             helm_client.delete_release(namespace, release_name)
 
