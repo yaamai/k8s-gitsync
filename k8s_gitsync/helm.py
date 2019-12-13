@@ -319,3 +319,10 @@ def destroy_unless_exist_in(resources, is_dry_run):
             logger.info("skipping delete (dry-run)")
         else:
             helm_client.delete_release(namespace, release_name)
+
+
+def expand(resource):
+    resource.content = _get_manifest(resource)
+    resource.id = resource.content["id"]
+    resource.requires = resource.content["_manifest_data"].get("requires", set())
+    return [resource]

@@ -9,6 +9,8 @@ logger = log.getLogger(__name__)
 
 LAST_APPLIED_KEY = "k8s-gitsync/last-applied-confighash"
 KGS_MANAGED_KEY = "k8s-gitsync/managed"
+KGS_REQUIRES_KEY = "k8s-gitsync/requires"
+KGS_DEFAULT_NS = "default"
 
 
 def _ensure_namespace(namespace):
@@ -17,7 +19,7 @@ def _ensure_namespace(namespace):
 
 
 def _get_state(manifest):
-    namespace = manifest["metadata"]["namespace"]
+    namespace = manifest["metadata"].get("namespace", KGS_DEFAULT_NS)
     name = manifest["metadata"]["name"]
     kind = manifest["kind"]
 
@@ -41,7 +43,7 @@ def _apply_manifest(manifest, filehash):
         manifest["metadata"]["labels"] = {}
     manifest["metadata"]["labels"][KGS_MANAGED_KEY] = "true"
 
-    _ensure_namespace(manifest["metadata"]["namespace"])
+    _ensure_namespace(manifest["metadata"].get("namespace", KGS_DEFAULT_NS))
 
     cmd = ["kubectl", "apply", "-f", "-"]
     _, errs, _ = utils.cmd_exec(cmd, stdin=yaml.dump(manifest).encode())
@@ -57,9 +59,17 @@ def expand_multi_document_file(resource):
 
         resources = []
         for document in documents:
+            # some k8s manifest has empty document
+            if document is None:
+                continue
+            print(resource)
             r = Resource("k8s", resource.manifest)
             r.content = document
             r.hash = hashlib.sha256(yaml.dump(document).encode()).hexdigest()
+            r.id = _k8s_resource_id(r.content["kind"], r.content["metadata"])
+            requires = r.content["metadata"].get("annotations", {}).get(KGS_REQUIRES_KEY)
+            if requires:
+                r.requires = set(requires.split(","))
             resources.append(r)
 
     return resources
@@ -78,7 +88,7 @@ def create_or_update(resource, is_dry_run):
 
 
 def _k8s_resource_id(kind, metadata):
-    return f'{kind.lower()}.{metadata["namespace"]}.{metadata["name"]}'
+    return f'{kind.lower()}.{metadata.get("namespace", KGS_DEFAULT_NS)}.{metadata["name"]}'
 
 
 def destroy_unless_exist_in(resources, is_dry_run):
@@ -137,7 +147,8 @@ def _filter_states_by_label(states, labelkey, labelvalue):
 def _delete_state(state):
     resource_id = _k8s_resource_id(state["kind"], state["metadata"])
     logger.info(f"deleting {resource_id}")
-    cmd = ["kubectl", "-n", state["metadata"]["namespace"], "delete", state["kind"], state["metadata"]["name"]]
+    namespace = state["metadata"].get("namespace", KGS_DEFAULT_NS)
+    cmd = ["kubectl", "-n", namespace, "delete", state["kind"], state["metadata"]["name"]]
     _, errs, _ = utils.cmd_exec(cmd)
     if errs:
         logger.error(f"failed to delete {resource_id}: {errs.decode()}")
@@ -156,7 +167,8 @@ def _measure_k8s_operation():
     for kind in kinds:
         setup = """
 from k8s_gitsync import utils
-cmd = ["kubectl", "get", "{}", "--all-namespaces", "-l", "{}" + "=true", "-o", "json"]
+cmd = ["kubectl", "get", "{}", "--all-namespaces",
+    "-l", "{}" + "=true", "-o", "json"]
         """.format(
             kind, KGS_MANAGED_KEY
         )
