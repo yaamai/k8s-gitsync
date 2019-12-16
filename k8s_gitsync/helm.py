@@ -324,5 +324,14 @@ def destroy_unless_exist_in(resources, is_dry_run):
 def expand(resource):
     resource.content = _get_manifest(resource)
     resource.id = resource.content["id"]
-    resource.requires = resource.content["_manifest_data"].get("requires", set())
+    requires = resource.content["_manifest_data"].get("requires")
+    if requires:
+        if isinstance(requires, list):
+            resource.requires = set(requires)
+        elif isinstance(requires, str):
+            resource.requires = set(requires.split(","))
+        else:
+            logger.warning("helm release's requires must be a list or a comma-separated string")
+    else:
+        resource.requires = set()
     return [resource]
