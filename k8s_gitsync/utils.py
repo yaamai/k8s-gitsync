@@ -13,12 +13,12 @@ def filter_directory_contains_file(files, pattern):
     pattern_re = re.compile(pattern)
     path_list = list(map(Path, files))
     contains_dir_list = [p for p in path_list if pattern_re.match(p.name)]
-    print(contains_dir_list)
+    logger.debug(f"list of directories contains charts: {contains_dir_list}")
 
     result = []
     for path in path_list:
         is_path_contain_file = [contains_dir.parent in path.parents for contains_dir in contains_dir_list]
-        print(path, is_path_contain_file)
+        logger.debug(f"Checking that the directory contains charts: dir[{path}], charts[{is_path_contain_file}]")
         if not any(is_path_contain_file):
             result.append(str(path))
 
