@@ -68,7 +68,8 @@ def get_manifest_files(repo_dir):
         logger.info(f"  {m}")
     logger.info(f"detected helm manifest files:")
     for m in map(lambda x: (x.manifest, x.values), helm_manifest):
-        logger.info(f"  {m}")
+        logger.info(f"  meta: {m[0]}")
+        logger.info(f"  values: {m[1]}")
 
     manifests = []
     manifests.extend(k8s_manifest)
