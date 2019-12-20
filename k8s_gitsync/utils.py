@@ -54,9 +54,9 @@ def get_manifest_files(repo_dir):
     path = os.path.join(repo_dir, "**/*")
     logger.info(f"begin to walk manifest from {path}")
     files = glob(path, recursive=True)
-    logger.info(f"  target files: {files}")
+    logger.info(f"  target files:")
     for filepath in files:
-        logger.info(f"'{filepath}'")
+        logger.info(f"    {filepath}")
 
     files = filter_directory_contains_file(files, "Chart\\.yaml")
 
@@ -65,10 +65,10 @@ def get_manifest_files(repo_dir):
 
     logger.info(f"detected k8s manifest files:")
     for m in map(lambda x: x.manifest, k8s_manifest):
-        logger.info(f"'{m}'")
+        logger.info(f"  {m}")
     logger.info(f"detected helm manifest files:")
     for m in map(lambda x: (x.manifest, x.values), helm_manifest):
-        logger.info(m)
+        logger.info(f"  {m}")
 
     manifests = []
     manifests.extend(k8s_manifest)
