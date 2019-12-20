@@ -13,12 +13,12 @@ def filter_directory_contains_file(files, pattern):
     pattern_re = re.compile(pattern)
     path_list = list(map(Path, files))
     contains_dir_list = [p for p in path_list if pattern_re.match(p.name)]
-    print(contains_dir_list)
+    logger.debug(f"list of directories contains charts: {contains_dir_list}")
 
     result = []
     for path in path_list:
         is_path_contain_file = [contains_dir.parent in path.parents for contains_dir in contains_dir_list]
-        print(path, is_path_contain_file)
+        logger.debug(f"Checking that the directory contains charts: dir[{path}], charts[{is_path_contain_file}]")
         if not any(is_path_contain_file):
             result.append(str(path))
 
@@ -55,14 +55,20 @@ def get_manifest_files(repo_dir):
     logger.info(f"begin to walk manifest from {path}")
     files = glob(path, recursive=True)
     logger.info(f"  target files: {files}")
+    for filepath in files:
+        logger.info(f"'{filepath}'")
 
-    files = filter_directory_contains_file(files, "Chart\.yaml")
+    files = filter_directory_contains_file(files, "Chart\\.yaml")
 
     files[:], helm_manifest = _get_helm_file(files)
     files[:], k8s_manifest = _get_k8s_file(files)
 
-    logger.info(f"detected k8s manifest files: {list(map(lambda x:x.manifest, k8s_manifest))}")
-    logger.info(f"detected helm manifest files: {list(map(lambda x:(x.manifest, x.values), helm_manifest))}")
+    logger.info(f"detected k8s manifest files:")
+    for m in map(lambda x: x.manifest, k8s_manifest):
+        logger.info(f"'{m}'")
+    logger.info(f"detected helm manifest files:")
+    for m in map(lambda x: (x.manifest, x.values), helm_manifest):
+        logger.info(m)
 
     manifests = []
     manifests.extend(k8s_manifest)
