@@ -1,3 +1,4 @@
+import sys
 import argparse
 from toposort import toposort_flatten
 from . import utils
@@ -22,6 +23,11 @@ def main():
     if conf.bench_k8s_get:
         k8s._measure_k8s_operation()
         return
+
+    # probe k8s
+    if not utils.probe_k8s():
+        logger.error("failed to connect k8s server")
+        sys.exit(1)
 
     # find all manifest files
     resources = utils.get_manifest_files(conf.repo)

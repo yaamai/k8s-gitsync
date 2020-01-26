@@ -83,3 +83,11 @@ def cmd_exec(cmd, stdin=None):
     outs, errs = p.communicate(stdin)
     log.command_result_debug(logger, cmd, outs, errs)
     return outs, errs, p.returncode
+
+
+def probe_k8s():
+    _, _, rc = cmd_exec(["kubectl", "version"])
+    if rc == 0:
+        return True
+    else:
+        return False
