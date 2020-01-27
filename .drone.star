@@ -29,7 +29,7 @@ def pipeline(arch):
           "build_args": [
             "ARCH=" + arch
           ],
-          "tags": ["${DRONE_COMMIT_SHA:0:8}-${DRONE_STAGE_ARCH}"]
+          "tags": ["${DRONE_COMMIT_SHA:0:7}-${DRONE_STAGE_ARCH}"]
         }
       }
     ]
@@ -51,8 +51,8 @@ def docker_manifest():
           "password": {
             "from_secret": "docker_password"
           },
-          "target": "yaamai/k8s-gitsync:${DRONE_COMMIT_SHA:0:8}",
-          "template": "yaamai/k8s-gitsync:${DRONE_COMMIT_SHA:0:8}-ARCH",
+          "target": "yaamai/k8s-gitsync:${DRONE_COMMIT_SHA:0:7}",
+          "template": "yaamai/k8s-gitsync:${DRONE_COMMIT_SHA:0:7}-ARCH",
           "platforms": [
             "linux/amd64",
             "linux/arm",
