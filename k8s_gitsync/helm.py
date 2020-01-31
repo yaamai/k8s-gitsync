@@ -52,7 +52,13 @@ class HelmV2Client:
             cmd += [f"{localpath}{chart_name}"]
         else:
             cmd += [chart_name]
-        outs, _, _ = utils.cmd_exec(cmd, values)
+        outs, errs, rc = utils.cmd_exec(cmd, values)
+
+        if rc != 0:
+            logger.error("failed to execute helm upgrade --install")
+            logger.error(f"stdout: {outs.decode()}")
+            logger.error(f"stderr: {errs.decode()}")
+            return
 
         # remove WARNING:, DEBUG: Release
         warning_log_re = re.compile(r"^(WARNING:|DEBUG:|Release).*", re.MULTILINE)
@@ -62,7 +68,13 @@ class HelmV2Client:
 
     def delete_release(self, namespace, release_name):
         cmd = [self.helm_binary_path, "delete", "--purge", release_name]
-        outs, _, _ = utils.cmd_exec(cmd)
+        outs, errs, rc = utils.cmd_exec(cmd)
+
+        if rc != 0:
+            logger.error("failed to execute helm upgrade --install")
+            logger.error(f"stdout: {outs.decode()}")
+            logger.error(f"stderr: {errs.decode()}")
+
         return
 
 
@@ -104,7 +116,13 @@ class HelmV3Client(HelmV2Client):
         if repo is not None and repo != "":
             cmd += ["--repo", repo]
 
-        outs, _, _ = utils.cmd_exec(cmd, values)
+        outs, errs, rc = utils.cmd_exec(cmd, values)
+
+        if rc != 0:
+            logger.error("failed to execute helm upgrade --install")
+            logger.error(f"stdout: {outs.decode()}")
+            logger.error(f"stderr: {errs.decode()}")
+            return
 
         # remove WARNING:, DEBUG: Release
         warning_log_re = re.compile(r"^(WARNING:|DEBUG:|Release).*", re.MULTILINE)
@@ -127,7 +145,13 @@ class HelmV3Client(HelmV2Client):
             cmd += [f"{localpath}{chart_name}"]
         else:
             cmd += [chart_name]
-        outs, _, _ = utils.cmd_exec(cmd, values)
+        outs, errs, rc = utils.cmd_exec(cmd, values)
+
+        if rc != 0:
+            logger.error("failed to execute helm upgrade")
+            logger.error(f"stdout: {outs.decode()}")
+            logger.error(f"stderr: {errs.decode()}")
+            return
 
         # remove WARNING:, DEBUG: Release
         warning_log_re = re.compile(r"^(WARNING:|DEBUG:|Release).*", re.MULTILINE)
