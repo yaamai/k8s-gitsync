@@ -38,21 +38,22 @@ class HelmV2Client:
 
         return [_rename_key(e) for e in release_list["Releases"]]
 
-    def upgrade_install_release(self, namespace, release_name, repo, localpath, chart_name, version, values):
+    def upgrade_install_release(self, manifest):
+        # namespace, release_name, repo, localpath, chart_name, version, values
         cmd = []
         cmd += [self.helm_binary_path, "upgrade"]
         cmd += ["--output", "json"]
-        cmd += ["--install", release_name]
-        cmd += ["--namespace", namespace]
+        cmd += ["--install", manifest["release_name"]]
+        cmd += ["--namespace", manifest["namespace"]]
         cmd += ["--values", "-"]
-        cmd += ["--version", version]
-        if repo is not None and repo != "":
-            cmd += ["--repo", repo]
-        if localpath is not None and localpath != "":
-            cmd += [f"{localpath}{chart_name}"]
+        cmd += ["--version", manifest["version"]]
+        if manifest["repo"] is not None and manifest["repo"] != "":
+            cmd += ["--repo", manifest["repo"]]
+        if manifest["localpath"] is not None and manifest["localpath"] != "":
+            cmd += [f"{manifest['localpath']}{manifest['chart_name']}"]
         else:
-            cmd += [chart_name]
-        outs, errs, rc = utils.cmd_exec(cmd, values)
+            cmd += [manifest["chart_name"]]
+        outs, errs, rc = utils.cmd_exec(cmd, manifest["values"])
 
         if rc != 0:
             logger.error("failed to execute helm upgrade --install")
@@ -99,23 +100,23 @@ class HelmV3Client(HelmV2Client):
             return {}
         return values
 
-    def _install_release(self, namespace, release_name, repo, localpath, chart_name, version, values):
-        HelmV3Client._ensure_namespace(namespace)
+    def _install_release(self, manifest):
+        HelmV3Client._ensure_namespace(manifest["namespace"])
         cmd = []
         cmd += [self.helm_binary_path, "install"]
-        cmd += [release_name]
-        if localpath is not None and localpath != "":
-            cmd += [f"{localpath}{chart_name}"]
+        cmd += [manifest["release_name"]]
+        if manifest["localpath"] is not None and manifest["localpath"] != "":
+            cmd += [f"{manifest['localpath']}{manifest['chart_name']}"]
         else:
-            cmd += [chart_name]
+            cmd += [manifest["chart_name"]]
         cmd += ["--output", "json"]
-        cmd += ["--namespace", namespace]
-        cmd += ["--version", version]
+        cmd += ["--namespace", manifest["namespace"]]
+        cmd += ["--version", manifest["version"]]
         cmd += ["--values", "-"]
-        if repo is not None and repo != "":
-            cmd += ["--repo", repo]
+        if manifest["repo"] is not None and manifest["repo"] != "":
+            cmd += ["--repo", manifest["repo"]]
 
-        outs, errs, rc = utils.cmd_exec(cmd, values)
+        outs, errs, rc = utils.cmd_exec(cmd, manifest["values"])
 
         if rc != 0:
             logger.error("failed to execute helm upgrade --install")
@@ -129,22 +130,22 @@ class HelmV3Client(HelmV2Client):
 
         return json.loads(outs_json)
 
-    def _upgrade_release(self, namespace, release_name, repo, localpath, chart_name, version, values):
-        HelmV3Client._ensure_namespace(namespace)
+    def _upgrade_release(self, manifest):
+        HelmV3Client._ensure_namespace(manifest["namespace"])
         cmd = []
         cmd += [self.helm_binary_path, "upgrade"]
         cmd += ["--output", "json"]
-        cmd += ["--install", release_name]
-        cmd += ["--namespace", namespace]
+        cmd += ["--install", manifest["release_name"]]
+        cmd += ["--namespace", manifest["namespace"]]
         cmd += ["--values", "-"]
-        cmd += ["--version", version]
-        if repo is not None and repo != "":
-            cmd += ["--repo", repo]
-        if localpath is not None and localpath != "":
-            cmd += [f"{localpath}{chart_name}"]
+        cmd += ["--version", manifest[""]]
+        if manifest["repo"] is not None and manifest["repo"] != "":
+            cmd += ["--repo", manifest[""]]
+        if manifest["localpath"] is not None and manifest["localpath"] != "":
+            cmd += [f"{manifest['localpath']}{manifest['chart_name']}"]
         else:
-            cmd += [chart_name]
-        outs, errs, rc = utils.cmd_exec(cmd, values)
+            cmd += [manifest["chart_name"]]
+        outs, errs, rc = utils.cmd_exec(cmd, manifest["values"])
 
         if rc != 0:
             logger.error("failed to execute helm upgrade")
@@ -165,12 +166,12 @@ class HelmV3Client(HelmV2Client):
                 return True
         return False
 
-    def upgrade_install_release(self, namespace, release_name, repo, localpath, chart_name, version, values):
+    def upgrade_install_release(self, manifest):
         # check installed or not
         # because values from stdin not fully supported yet on v3.0.0 (#7002)
-        if self._is_installed(release_name, namespace):
-            return self._upgrade_release(namespace, release_name, repo, localpath, chart_name, version, values)
-        return self._install_release(namespace, release_name, repo, localpath, chart_name, version, values)
+        if self._is_installed(manifest["release_name"], manifest["namespace"]):
+            return self._upgrade_release(manifest)
+        return self._install_release(manifest)
 
     def delete_release(self, namespace, release_name):
         cmd = [self.helm_binary_path, "delete", "-n", namespace, release_name]
@@ -200,10 +201,8 @@ class HelmClient:
     def get_release_list(self):
         return self.client.get_release_list()
 
-    def upgrade_install_release(self, namespace, release_name, repo, localpath, chart_name, version, values):
-        return self.client.upgrade_install_release(
-            namespace, release_name, repo, localpath, chart_name, version, values
-        )
+    def upgrade_install_release(self, manifest):
+        return self.client.upgrade_install_release(manifest)
 
     def delete_release(self, namespace, release_name):
         return self.client.delete_release(namespace, release_name)
@@ -316,15 +315,15 @@ def create_or_update(resource, is_dry_run):
         if is_dry_run:
             logger.info("skipping install or upgrade a helm chart (dry-run)")
         else:
-            helm_client.upgrade_install_release(
-                manifest["namespace"],
-                manifest["name"],
-                manifest["chart"].get("repo", None),
-                manifest["chart"].get("localpath", None),
-                manifest["chart"]["name"],
-                manifest["chart"]["version"],
-                yaml.safe_dump(values).encode(),
-            )
+            helm_client.upgrade_install_release({
+                'namespace': manifest["namespace"],
+                'release_name': manifest["name"],
+                'repo': manifest["chart"].get("repo", None),
+                'localpath': manifest["chart"].get("localpath", None),
+                'chart_name': manifest["chart"]["name"],
+                'version': manifest["chart"]["version"],
+                'values': yaml.safe_dump(values).encode(),
+                })
 
 
 def destroy_unless_exist_in(resources, is_dry_run):

@@ -6,7 +6,7 @@ from pathlib import Path
 from .resource import Resource
 from . import log
 
-logger = log.getLogger(__name__)
+logger = log.get_logger(__name__)
 
 
 def filter_directory_contains_file(files, pattern):
