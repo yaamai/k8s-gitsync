@@ -1,11 +1,14 @@
 import json
-import yaml
 import hashlib
+import timeit
+from pprint import pprint as pp
+import yaml
 from .resource import Resource
 from . import utils
 from . import log
 
-logger = log.getLogger(__name__)
+
+logger = log.get_logger(__name__)
 
 LAST_APPLIED_KEY = "k8s-gitsync/last-applied-confighash"
 KGS_MANAGED_KEY = "k8s-gitsync/managed"
@@ -27,8 +30,7 @@ def _get_state(manifest):
     outs, _, rc = utils.cmd_exec(cmd)
     if rc != 0:
         return None
-    else:
-        return json.loads(outs.decode())
+    return json.loads(outs.decode())
 
 
 def _apply_manifest(manifest, filehash):
@@ -156,10 +158,7 @@ def _delete_state(state):
     logger.info(f"deleted {resource_id}")
 
 
-def _measure_k8s_operation():
-    import timeit
-    from pprint import pprint as pp
-
+def measure_k8s_operation():
     cmd = ["kubectl", "api-resources", "-o", "name"]
     outs, _, _ = utils.cmd_exec(cmd)
     kinds = outs.decode().split()

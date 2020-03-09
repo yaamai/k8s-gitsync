@@ -2,7 +2,7 @@ import os
 import logging
 
 
-def getLogger(name):
+def get_logger(name):
     formatter = logging.Formatter("%(asctime)s %(levelname)s %(message)s", "%Y/%m/%d %H:%M:%S")
     handler = logging.StreamHandler()
     handler.setFormatter(formatter)

@@ -79,15 +79,14 @@ def get_manifest_files(repo_dir):
 
 
 def cmd_exec(cmd, stdin=None):
-    p = Popen(cmd, stdin=PIPE, stdout=PIPE, stderr=PIPE)
-    outs, errs = p.communicate(stdin)
+    proc = Popen(cmd, stdin=PIPE, stdout=PIPE, stderr=PIPE)
+    outs, errs = proc.communicate(stdin)
     log.command_result_debug(logger, cmd, outs, errs)
-    return outs, errs, p.returncode
+    return outs, errs, proc.returncode
 
 
 def probe_k8s():
     _, _, rc = cmd_exec(["kubectl", "version"])
     if rc == 0:
         return True
-    else:
-        return False
+    return False

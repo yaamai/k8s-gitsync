@@ -1,11 +1,11 @@
 import re
-import yaml
-import json
 import hashlib
+import json
+import yaml
 from . import utils
 from . import log
 
-logger = log.getLogger(__name__)
+logger = log.get_logger(__name__)
 
 KGS_MANAGED_KEY = "k8s-gitsync"
 
@@ -14,7 +14,7 @@ class HelmV2Client:
     def __init__(self, helm_binary_path="./helm3/helm"):
         self.helm_binary_path = helm_binary_path
 
-    def get_values(self, namespace, release_name):
+    def get_values(self, _, release_name):
         cmd = [self.helm_binary_path, "get", "values", release_name, "--output", "json"]
         outs, _, _ = utils.cmd_exec(cmd)
         values = json.loads(outs.decode())
@@ -58,7 +58,7 @@ class HelmV2Client:
             logger.error("failed to execute helm upgrade --install")
             logger.error(f"stdout: {outs.decode()}")
             logger.error(f"stderr: {errs.decode()}")
-            return
+            return None
 
         # remove WARNING:, DEBUG: Release
         warning_log_re = re.compile(r"^(WARNING:|DEBUG:|Release).*", re.MULTILINE)
@@ -66,7 +66,7 @@ class HelmV2Client:
 
         return json.loads(outs_json)
 
-    def delete_release(self, namespace, release_name):
+    def delete_release(self, _, release_name):
         cmd = [self.helm_binary_path, "delete", "--purge", release_name]
         outs, errs, rc = utils.cmd_exec(cmd)
 
@@ -75,15 +75,14 @@ class HelmV2Client:
             logger.error(f"stdout: {outs.decode()}")
             logger.error(f"stderr: {errs.decode()}")
 
-        return
-
 
 class HelmV3Client(HelmV2Client):
     def __init__(self, helm_binary_path):
         super().__init__(helm_binary_path)
         self.helm_binary_path = helm_binary_path
 
-    def _ensure_namespace(self, namespace):
+    @staticmethod
+    def _ensure_namespace(namespace):
         cmd = ["kubectl", "create", "namespace", namespace]
         utils.cmd_exec(cmd)
 
@@ -101,7 +100,7 @@ class HelmV3Client(HelmV2Client):
         return values
 
     def _install_release(self, namespace, release_name, repo, localpath, chart_name, version, values):
-        self._ensure_namespace(namespace)
+        HelmV3Client._ensure_namespace(namespace)
         cmd = []
         cmd += [self.helm_binary_path, "install"]
         cmd += [release_name]
@@ -122,7 +121,7 @@ class HelmV3Client(HelmV2Client):
             logger.error("failed to execute helm upgrade --install")
             logger.error(f"stdout: {outs.decode()}")
             logger.error(f"stderr: {errs.decode()}")
-            return
+            return None
 
         # remove WARNING:, DEBUG: Release
         warning_log_re = re.compile(r"^(WARNING:|DEBUG:|Release).*", re.MULTILINE)
@@ -131,7 +130,7 @@ class HelmV3Client(HelmV2Client):
         return json.loads(outs_json)
 
     def _upgrade_release(self, namespace, release_name, repo, localpath, chart_name, version, values):
-        self._ensure_namespace(namespace)
+        HelmV3Client._ensure_namespace(namespace)
         cmd = []
         cmd += [self.helm_binary_path, "upgrade"]
         cmd += ["--output", "json"]
@@ -151,7 +150,7 @@ class HelmV3Client(HelmV2Client):
             logger.error("failed to execute helm upgrade")
             logger.error(f"stdout: {outs.decode()}")
             logger.error(f"stderr: {errs.decode()}")
-            return
+            return None
 
         # remove WARNING:, DEBUG: Release
         warning_log_re = re.compile(r"^(WARNING:|DEBUG:|Release).*", re.MULTILINE)
@@ -171,13 +170,11 @@ class HelmV3Client(HelmV2Client):
         # because values from stdin not fully supported yet on v3.0.0 (#7002)
         if self._is_installed(release_name, namespace):
             return self._upgrade_release(namespace, release_name, repo, localpath, chart_name, version, values)
-        else:
-            return self._install_release(namespace, release_name, repo, localpath, chart_name, version, values)
+        return self._install_release(namespace, release_name, repo, localpath, chart_name, version, values)
 
     def delete_release(self, namespace, release_name):
         cmd = [self.helm_binary_path, "delete", "-n", namespace, release_name]
-        outs, _, _ = utils.cmd_exec(cmd)
-        return
+        _, _, _ = utils.cmd_exec(cmd)
 
 
 class HelmClient:
@@ -253,11 +250,9 @@ def _get_state(helm_client):
 
 
 def _get_values(value_files):
-    # TODO: currently, only support one values file
     if len(value_files) != 1:
         return {}
-    else:
-        return yaml.safe_load(open(value_files[0]))
+    return yaml.safe_load(open(value_files[0]))
 
 
 def _get_manifest(resource):
@@ -338,7 +333,7 @@ def destroy_unless_exist_in(resources, is_dry_run):
     manifests = [_get_manifest(r) for r in resources]
     manifest_dict = {m["id"]: m for m in manifests}
 
-    for id_str, namespace, release_name in _check_delete(state_dict, manifest_dict):
+    for _, namespace, release_name in _check_delete(state_dict, manifest_dict):
         if is_dry_run:
             logger.info("skipping delete a helm chart (dry-run)")
         else:

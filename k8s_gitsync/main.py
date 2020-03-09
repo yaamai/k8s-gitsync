@@ -1,12 +1,12 @@
 import sys
 import argparse
-from toposort import toposort_flatten
+from toposort import toposort_flatten  # type: ignore
 from . import utils
 from . import k8s
 from . import helm
 from . import log
 
-logger = log.getLogger(__name__)
+logger = log.get_logger(__name__)
 
 
 def main():
@@ -21,7 +21,7 @@ def main():
 
     # benchmark subcommand
     if conf.bench_k8s_get:
-        k8s._measure_k8s_operation()
+        k8s.measure_k8s_operation()
         return
 
     # probe k8s
