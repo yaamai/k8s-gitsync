@@ -142,7 +142,8 @@ disable=print-statement,
         missing-module-docstring,
         missing-class-docstring,
         missing-function-docstring,
-        logging-format-interpolation
+        logging-format-interpolation,
+        too-few-public-methods
 
 # Enable the message, report, category or checker with the given id(s). You can
 # either give multiple identifier separated by comma (,) or put this option
@@ -305,7 +306,8 @@ good-names=i,
            e,
            m,
            v,
-           s
+           s,
+           T
 
 # Include a hint for the correct naming format with invalid-name.
 include-naming-hint=no
