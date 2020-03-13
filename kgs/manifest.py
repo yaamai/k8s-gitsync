@@ -3,6 +3,7 @@ import hashlib
 import re
 from pathlib import Path
 from typing import List, Optional, TypeVar, Type, ClassVar
+from dataclasses_json import dataclass_json
 import yaml
 from typing_extensions import Protocol
 from .consts import KGS_DEFAULT_NS, LAST_APPLIED_KEY, KGS_MANAGED_KEY
@@ -23,6 +24,7 @@ class Manifest(Protocol):
         ...
 
 
+@dataclass_json
 @dataclass
 class K8SManifest(Manifest):
     file_pattern: ClassVar[re.Pattern] = re.compile(r"(.*)\.ya?ml$")
@@ -76,6 +78,7 @@ class K8SManifest(Manifest):
         return f'{self.data["kind"].lower()}.{namespace}.{self.data["metadata"]["name"]}'
 
 
+@dataclass_json
 @dataclass
 class HelmManifest(Manifest):
     manifest_pattern: ClassVar[re.Pattern] = re.compile(r"(.*)\.helm$")
