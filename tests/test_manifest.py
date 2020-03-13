@@ -20,13 +20,13 @@ class TestManifests(unittest.TestCase):
             ],
             [
                 [Path("hoge.yaml")],
-                [manifest.K8SManifest()],
+                [manifest.K8SManifest(filepath='hoge.yaml', data={'metadata': {'annotations': {'k8s-gitsync/last-applied-confighash': 'ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356'}, 'labels': {'k8s-gitsync/managed': 'true'}}})],
                 b'{}',
             ],
             [
                 [Path("hoge.yaml")],
-                [manifest.K8SManifest(), manifest.K8SManifest()],
-                b'---\na: 100\n---\nb:100',
+                [manifest.K8SManifest(filepath='hoge.yaml', data={'a': 100, 'metadata': {'annotations': {'k8s-gitsync/last-applied-confighash': '8e4933317f9bdd87e5ae4e3dd4275e36ec18b3a01b57b920aa91a0f4915a5220'}, 'labels': {'k8s-gitsync/managed': 'true'}}}), manifest.K8SManifest(filepath='hoge.yaml', data={'b': 100, 'metadata': {'annotations': {'k8s-gitsync/last-applied-confighash': '14d2bf305401a8ebc4043abec2d226c9b5b44c4556aaa048d186405712b3530e'}, 'labels': {'k8s-gitsync/managed': 'true'}}})],
+                b'---\na: 100\n---\nb: 100',
             ],
             [
                 [Path("hoge.helm")],
