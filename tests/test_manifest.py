@@ -4,15 +4,15 @@ from pathlib import Path
 from unittest import mock
 from unittest.mock import mock_open
 import yaml
-from kgs.manifest import load_recursively, K8SManifest, HelmManifest
+from kgs.manifest.utils import load_recursively, K8SManifest, HelmManifest
 
 
 class TestManifests(unittest.TestCase):
     def setUp(self):
         self.maxDiff = None
 
-    @mock.patch('kgs.manifest.Path')
-    @mock.patch('kgs.manifest.open')
+    @mock.patch('kgs.manifest.utils.Path')
+    @mock.patch('kgs.manifest.k8s.open')
     def test_load_recursively(self, open_mock, path_mock):
         testdata_list = []
         path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "test_manifest_data.yaml")
