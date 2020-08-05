@@ -2,11 +2,11 @@ from dataclasses import dataclass, field
 import hashlib
 from typing import List, Type
 from typing import Final
+from typing import Optional
 from subprocess import Popen, PIPE
 import json
 import yaml
 from dataclasses_json import dataclass_json
-from typing_extensions import Protocol
 
 
 KGS_DEFAULT_NS: Final[str] = "default"
@@ -29,15 +29,9 @@ def _safe_get(d: dict, *args: str, default=None):
     return r
 
 
-# manifest represents resource definitions identified by id
-class Manifest(Protocol):
-    def get_id(self) -> str:
-        ...
-
-
 @dataclass_json
 @dataclass
-class K8SManifest(Manifest):
+class K8SManifest():
     data: dict = field(default_factory=dict)  # , repr=False)
 
     def get_id(self):
@@ -79,22 +73,9 @@ class K8SManifest(Manifest):
         return manifests
 
 
-class State(Protocol):
-    def is_updated(self) -> bool:
-        ...
-
-
-class Operator(Protocol):
-    def get_state(self, manifest: Manifest) -> State:
-        ...
-
-    def create_or_update(self, manifest: Manifest, dry_run: bool):
-        ...
-
-
 @dataclass_json
 @dataclass
-class K8SState(State):
+class K8SState():
     m: K8SManifest
     state: dict = field(default_factory=dict)
 
@@ -104,9 +85,9 @@ class K8SState(State):
         return current == expect
 
 
-class K8SOperator(Operator):
-    # TODO: optional return
-    def _get_state(self, manifest):
+class K8SOperator():
+    @staticmethod
+    def _get_state(manifest) -> Optional[dict]:
         namespace = manifest["metadata"].get("namespace", KGS_DEFAULT_NS)
         name = manifest["metadata"]["name"]
         kind = manifest["kind"]
@@ -118,17 +99,27 @@ class K8SOperator(Operator):
 
         return json.loads(outs.decode())
 
-    def get_state(self, manifest: Manifest) -> State:
-        return K8SState(m=manifest, state=self._get_state(manifest))
+    def get_state(self, manifest: K8SManifest) -> Optional[K8SState]:
+        state = self._get_state(manifest)
+        if not state:
+            return None
+        return K8SState(m=manifest, state=state)
 
-    def create_or_update(self, manifest: Manifest, dry_run: bool):
-        if self.get_state(manifest).is_updated():
+    @staticmethod
+    def _ensure_namespace(namespace):
+        cmd = ["kubectl", "create", "namespace", namespace]
+        cmd_exec(cmd)
+
+    def create_or_update(self, manifest: K8SManifest, dry_run: bool):
+        state = self.get_state(manifest)
+        if state and state.is_updated():
             return
 
         if dry_run:
             return
 
-        K8SState._ensure_namespace(self.m.data["metadata"].get("namespace", KGS_DEFAULT_NS))
+        namespace = _safe_get(manifest.data, "metadata", "namespace", default=KGS_DEFAULT_NS)
+        self._ensure_namespace(namespace)
 
         cmd = ["kubectl", "apply", "-f", "-"]
-        _, _, _ = utils.cmd_exec(cmd, stdin=yaml.dump(self.m.data).encode())
+        _, _, _ = cmd_exec(cmd, stdin=yaml.dump(manifest.data).encode())
