@@ -1,19 +1,28 @@
-k8s:
-- in: {}
-  expect:
-    data:
-      metadata:
-        annotations:
-          k8s-gitsync/last-applied-confighash: ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356
-        labels:
-          k8s-gitsync/managed: "true"
-- in:
-    a: 100
-  expect:
-    data:
+test_manifest_load:
+  k8s:
+  - in: {}
+    expect:
+      data:
+        metadata:
+          annotations:
+            k8s-gitsync/last-applied-confighash: ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356
+          labels:
+            k8s-gitsync/managed: "true"
+  - in:
       a: 100
-      metadata:
-        annotations:
-          k8s-gitsync/last-applied-confighash: 8e4933317f9bdd87e5ae4e3dd4275e36ec18b3a01b57b920aa91a0f4915a5220
-        labels:
-          k8s-gitsync/managed: "true"
+    expect:
+      data:
+        a: 100
+        metadata:
+          annotations:
+            k8s-gitsync/last-applied-confighash: 8e4933317f9bdd87e5ae4e3dd4275e36ec18b3a01b57b920aa91a0f4915a5220
+          labels:
+            k8s-gitsync/managed: "true"
+test_operator_get_state:
+  - in: {"metadata": {"name": "a", "namespace": "b"}, "kind": "Pod"}
+    expect: ['kubectl', '-n', 'b', 'get', 'Pod', 'a', '-o', 'json']
+  - in: {"metadata": {"name": "a"}, "kind": "Pod"}
+    expect: ['kubectl', '-n', 'default', 'get', 'Pod', 'a', '-o', 'json']
+  - in: {"metadata": {}, "kind": "Pod"}
+    expect: []
+    return: null

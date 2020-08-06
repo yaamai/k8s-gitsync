@@ -38,6 +38,15 @@ class K8SManifest():
         namespace = self.data.get("namespace", KGS_DEFAULT_NS)
         return f'{self.data["kind"].lower()}.{namespace}.{self.data["metadata"]["name"]}'
 
+    def get_namespace(self):
+        return _safe_get(self.data, "metadata", "namespace", default=KGS_DEFAULT_NS)
+
+    def get_name(self):
+        return _safe_get(self.data, "metadata", "name")
+
+    def get_kind(self):
+        return _safe_get(self.data, "kind")
+
     @staticmethod
     def _annotate_manifest_data(data: dict) -> dict:
         hashhex = hashlib.sha256(yaml.dump(data).encode()).hexdigest()
@@ -88,9 +97,11 @@ class K8SState():
 class K8SOperator():
     @staticmethod
     def _get_state(manifest) -> Optional[dict]:
-        namespace = manifest["metadata"].get("namespace", KGS_DEFAULT_NS)
-        name = manifest["metadata"]["name"]
-        kind = manifest["kind"]
+        namespace = manifest.get_namespace()
+        name = manifest.get_name()
+        kind = manifest.get_kind()
+        if not all([namespace, name, kind]):
+            return None
 
         cmd = ["kubectl", "-n", namespace, "get", kind, name, "-o", "json"]
         outs, _, rc = cmd_exec(cmd)
@@ -118,8 +129,7 @@ class K8SOperator():
         if dry_run:
             return
 
-        namespace = _safe_get(manifest.data, "metadata", "namespace", default=KGS_DEFAULT_NS)
-        self._ensure_namespace(namespace)
+        self._ensure_namespace(manifest.get_namespace())
 
         cmd = ["kubectl", "apply", "-f", "-"]
         _, _, _ = cmd_exec(cmd, stdin=yaml.dump(manifest.data).encode())
