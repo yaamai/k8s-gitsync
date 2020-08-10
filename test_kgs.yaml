@@ -18,11 +18,55 @@ test_manifest_load:
             k8s-gitsync/last-applied-confighash: 8e4933317f9bdd87e5ae4e3dd4275e36ec18b3a01b57b920aa91a0f4915a5220
           labels:
             k8s-gitsync/managed: "true"
+
 test_operator_get_state:
-  - in: {"metadata": {"name": "a", "namespace": "b"}, "kind": "Pod"}
+  - desc: normal
+    in: {"metadata": {"name": "a", "namespace": "b"}, "kind": "Pod"}
     expect: ['kubectl', '-n', 'b', 'get', 'Pod', 'a', '-o', 'json']
-  - in: {"metadata": {"name": "a"}, "kind": "Pod"}
+  - desc: missing namespace
+    in: {"metadata": {"name": "a"}, "kind": "Pod"}
     expect: ['kubectl', '-n', 'default', 'get', 'Pod', 'a', '-o', 'json']
-  - in: {"metadata": {}, "kind": "Pod"}
+  - desc: missing name
+    in: {"metadata": {}, "kind": "Pod"}
     expect: []
     return: null
+
+test_operator_create_or_update:
+  - desc: normal state does not synced
+    cmd_exec:
+    - [!bytes "{}", !bytes "{}", 0]
+    - [!bytes "{}", !bytes "{}", 0]
+    - [!bytes "{}", !bytes "{}", 0]
+    in: {"metadata": {"name": "a", "namespace": "b"}, "kind": "Pod"}
+    expect:
+    - args: [['kubectl', '-n', 'b', 'get', 'Pod', 'a', '-o', 'json']]
+      kwargs: {}
+    - args: [['kubectl', 'create', 'namespace', 'b']]
+      kwargs: {}
+    - args: [['kubectl', 'apply', '-f', '-']]
+      kwargs:
+        stdin: !bytes |
+          kind: Pod
+          metadata:
+            annotations:
+              k8s-gitsync/last-applied-confighash: eedf1596e62bc950fd41873f337e58dea4a665c0025e1041ea5ff508b6ec14b9
+            labels:
+              k8s-gitsync/managed: 'true'
+            name: a
+            namespace: b
+  - desc: normal state synced
+    cmd_exec:
+    - - !bytes |
+        {
+          "metadata": {
+            "annotations": {
+              "k8s-gitsync/last-applied-confighash": "eedf1596e62bc950fd41873f337e58dea4a665c0025e1041ea5ff508b6ec14b9"
+            }
+          }
+        }
+      - !bytes "{}"
+      - 0
+    in: {"metadata": {"name": "a", "namespace": "b"}, "kind": "Pod"}
+    expect:
+    - args: [['kubectl', '-n', 'b', 'get', 'Pod', 'a', '-o', 'json']]
+      kwargs: {}

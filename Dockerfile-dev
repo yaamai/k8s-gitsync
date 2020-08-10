@@ -1,0 +1,13 @@
+FROM python:3.8.2-alpine
+ARG ARCH=amd64
+RUN apk add --virtual build-dep build-base &&\
+    pip install flake8 autopep8 mypy pylint &&\
+    apk del build-dep && rm -rf /var/cache/apk/* && rm -rf /root/.cache
+RUN apk add --update python3 curl &&\
+    curl -Lo helm.tar.gz https://get.helm.sh/helm-v3.0.0-linux-$ARCH.tar.gz &&\
+    curl -Lo kubectl https://storage.googleapis.com/kubernetes-release/release/v1.16.0/bin/linux/$ARCH/kubectl &&\
+    tar xf helm.tar.gz &&\
+    chmod +x linux-$ARCH/helm &&\
+    chmod +x kubectl &&\
+    mv linux-$ARCH/helm kubectl /usr/local/bin &&\
+    rm -rf helm.tar.gz linux-$ARCH/

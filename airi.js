@@ -1,0 +1,1 @@
+CMDS.python = {b: [BASE, "-e", "KUBECONFIG="+ENV.KUBECONFIG, "-e", "PATH="+ENV.PATH, "-e", "VIRTUAL_ENV="+ENV.VIRTUAL_ENV], s: ["--", "python"], i: "registry.naru.pw/de/python:kgs", a: CMDLINE.slice(1)}

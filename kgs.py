@@ -2,7 +2,7 @@ from dataclasses import dataclass, field
 import hashlib
 from typing import List, Type
 from typing import Final
-from typing import Optional
+from typing import TypeVar, Generic
 from subprocess import Popen, PIPE
 import json
 import yaml
@@ -94,27 +94,45 @@ class K8SState():
         return current == expect
 
 
+T = TypeVar('T')
+
+
+class Result(Generic[T]):
+    def __init__(self, result: T, detail: dict = None):
+        self.result = result
+        self.detail = detail
+
+    def get(self) -> T:
+        if self.result is not None:
+            return self.result
+        return self
+
+    def __bool__(self) -> bool:
+        return self.result is not None
+
+    @staticmethod
+    def error(detail: dict):
+        return Result[T](None, detail)  # type:ignore
+
+
+
 class K8SOperator():
     @staticmethod
-    def _get_state(manifest) -> Optional[dict]:
+    def get_state(manifest: K8SManifest) -> Result[K8SState]:
         namespace = manifest.get_namespace()
         name = manifest.get_name()
         kind = manifest.get_kind()
         if not all([namespace, name, kind]):
-            return None
+            return Result.error({"msg": "invalid manifest"})
 
         cmd = ["kubectl", "-n", namespace, "get", kind, name, "-o", "json"]
-        outs, _, rc = cmd_exec(cmd)
+        outs, errs, rc = cmd_exec(cmd)
+        if ("(NotFound):" in errs.decode()) and rc != 0:
+            return Result(K8SState(m=manifest, state={}))
         if rc != 0:
-            return None
+            return Result.error({"msg": "unexpected return code", "raw": errs.decode()})
 
-        return json.loads(outs.decode())
-
-    def get_state(self, manifest: K8SManifest) -> Optional[K8SState]:
-        state = self._get_state(manifest)
-        if not state:
-            return None
-        return K8SState(m=manifest, state=state)
+        return Result(K8SState(m=manifest, state=json.loads(outs.decode())))
 
     @staticmethod
     def _ensure_namespace(namespace):
@@ -122,8 +140,8 @@ class K8SOperator():
         cmd_exec(cmd)
 
     def create_or_update(self, manifest: K8SManifest, dry_run: bool):
-        state = self.get_state(manifest)
-        if state and state.is_updated():
+        result = self.get_state(manifest)
+        if not (_ := result.get()):  # pylint: disable=superfluous-parens
             return
 
         if dry_run:
@@ -133,3 +151,10 @@ class K8SOperator():
 
         cmd = ["kubectl", "apply", "-f", "-"]
         _, _, _ = cmd_exec(cmd, stdin=yaml.dump(manifest.data).encode())
+
+
+if __name__ == '__main__':
+    breakpoint()
+    mf = K8SManifest.parse_file("test.yaml")
+    oper = K8SOperator()
+    oper.create_or_update(mf[0], dry_run=False)
