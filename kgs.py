@@ -7,6 +7,7 @@ from dataclasses import field
 from pathlib import Path
 from subprocess import PIPE
 from subprocess import Popen
+from typing import Callable
 from typing import Final
 from typing import Generic
 from typing import Iterable
@@ -41,6 +42,10 @@ def _safe_get(d: dict, *args: str, default=None):
 
 class Manifest(Protocol):
     def get_id(self) -> str:
+        ...
+
+    @classmethod
+    def parse_dict(cls: Type['Manifest'], d: dict) -> 'Manifest':
         ...
 
 
@@ -203,29 +208,49 @@ class K8SOperator():
 # if values.yaml, check .helm
 # if .helm, check values
 
-def _get_files_in_samedir(paths: Iterable[Path], filepath: Path, pattern: re.Pattern) -> List[Path]:
+def _get_files_in_samedir(paths: Iterable[Path], filepath: Path, condition: Callable[[str], bool]) -> List[Path]:
     dir_files = [p for p in paths if list(p.parents) == list(filepath.parents)]
-    return [p for p in dir_files if pattern.match(str(p))]
+    return [p for p in dir_files if condition(str(p))]
 
+
+def _get_files_in_samedir_pattern(paths: Iterable[Path], filepath: Path, pattern: re.Pattern, name: str) -> List[Path]:
+    def _(path: str) -> bool:
+        m = pattern.match(path)
+        return m is not None and m.group(1) == name
+    return _get_files_in_samedir(paths, filepath, _)
+
+
+def _unwrap_any(*args: Optional[re.Match]) -> re.Match:
+    for opt in args:
+        if opt:
+            return opt
+    # this function expect least one of args must have value
+    raise Exception()
 
 HELM_MANIFEST_FILE_PATTERN: re.Pattern = re.compile(r"(.*)\.helm$")
 HELM_MANIFEST_VALUES_FILE_PATTERN: re.Pattern = re.compile(r"(.*)\.values\.ya?ml$")
 def _try_parse_helm(filepath: Path, paths: 'OrderedDict[Path, Optional[bool]]') -> Optional[List[HelmManifest]]:
-    breakpoint()
     match_helm = HELM_MANIFEST_FILE_PATTERN.match(str(filepath))
     match_values = HELM_MANIFEST_VALUES_FILE_PATTERN.match(str(filepath))
     if not match_helm and not match_values:
         return None
 
-    helm_file: Path
-    values_files: List[Path]
-    if match_helm:
-        helm_file = filepath
-        values_files = _get_files_in_samedir(paths, filepath, HELM_MANIFEST_VALUES_FILE_PATTERN)
+    filename = _unwrap_any(match_helm, match_values).group(1)
+    values_files = _get_files_in_samedir_pattern(paths, filepath, HELM_MANIFEST_VALUES_FILE_PATTERN, filename)
+    helm_file: Path = filepath
     if match_values:
-        _get_files_in_samedir(paths, filepath, HELM_MANIFEST_FILE_PATTERN)
-        values_files = _get_files_in_samedir(paths, filepath, HELM_MANIFEST_VALUES_FILE_PATTERN)
+        # rescan helm file based on values file's name
+        helm_file_candidate = _get_files_in_samedir_pattern(paths, filepath, HELM_MANIFEST_FILE_PATTERN, filename)
+        if len(helm_file_candidate) != 1:
+            # when only values file found, skip related files
+            for val in values_files:
+                paths[val] = False
+            return []
+        helm_file = helm_file_candidate[0]
 
+    paths[helm_file] = True
+    for val in values_files:
+        paths[val] = True
     return HelmManifest.parse_file(str(helm_file), [str(p) for p in values_files])
 
 
@@ -241,65 +266,28 @@ def _try_parse_k8s(filepath: Path, paths: 'OrderedDict[Path, Optional[bool]]') -
 
 
 def load_recursively(repo_path: str) -> List[Manifest]:
-    # NOTE: mypy OrderedDict not supported correctly
+    # path -> None(not processed), False(skipped), True(processed)
     paths: 'OrderedDict[Path, Optional[bool]]' = OrderedDict()
     for path in Path(repo_path).glob("**/*"):
         paths[path] = None
 
     manifest_list: List[Manifest] = []
-    for filepath, parsed in paths.items():
-        if parsed:
-            continue
-
-        k8s_result = _try_parse_k8s(filepath, paths)
-        if k8s_result:
-            manifest_list.extend(k8s_result)
+    for filepath, processed in paths.items():
+        if processed is not None:
             continue
 
         result = _try_parse_helm(filepath, paths)
-        if result:
+        if result is not None:
             manifest_list.extend(result)
             continue
 
+        k8s_result = _try_parse_k8s(filepath, paths)
+        if k8s_result is not None:
+            manifest_list.extend(k8s_result)
+            continue
+
+
     return manifest_list
-"""
-def _exclude_directory_contains_file(path_list: List[Path], pattern: re.Pattern) -> List[Path]:
-    contains_dir_list = [p for p in path_list if pattern.match(p.name)]
-
-    result = []
-    for path in path_list:
-        is_path_contain_file = [contains_dir.parent in path.parents for contains_dir in contains_dir_list]
-        if not any(is_path_contain_file):
-            result.append(path)
-
-    return result
-
-
-def _exclude_helm_manifest(path_list: List[Path], helm_manifests: List[HelmManifest]) -> List[Path]:
-    helm_manifest_file_list: List[str] = []
-    for m in helm_manifests:
-        helm_manifest_file_list.extend(m.get_filepath())
-
-    return list(filter(lambda p: str(p) not in helm_manifest_file_list, path_list))
-
-
-def load_recursively(path: str) -> List[Manifest]:
-    path_list = list(Path(path).glob("**/*"))
-
-    # exclude helm chart directory
-    path_list = _exclude_directory_contains_file(path_list, re.compile("Chart\\.yaml"))
-
-    # load manifests
-    helm_manifests = HelmManifest.parse_file(path_list)
-
-    path_list = _exclude_helm_manifest(path_list, helm_manifests)
-    k8s_manifests = K8SManifest.load(path_list)
-
-    manifest_list: List[Manifest] = []
-    manifest_list.extend(helm_manifests)
-    manifest_list.extend(k8s_manifests)
-    return manifest_list
-"""
 
 
 if __name__ == '__main__':

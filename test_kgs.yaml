@@ -120,6 +120,9 @@ test_recursive_load:
         repo: https://hoge.internal
     hoge.values.yaml: |
       a: 100
+    fuga.values.yaml: |
+      a: 200
+      b: 100
   manifests:
   - manifest:
       name: hoge
@@ -130,15 +133,65 @@ test_recursive_load:
         repo: https://hoge.internal
     values:
       a: 100
-
-
-
-
-
-
-
-
-
-
-
-
+- desc: helm manifest order
+  files:
+    001.values.yaml: |
+      a: 001
+    001.helm: |
+      ---
+      name: 001
+    100.helm: |
+      ---
+      name: 100
+  manifests:
+  - manifest:
+      name: 001
+    values:
+      a: 001
+  - manifest:
+      name: 100
+    values: {}
+- desc: helm k8s mixed
+  files:
+    001.values.yaml: |
+      a: 001
+    010.yaml: |
+      kind: Pod
+      metadata:
+        name: 010
+    001.helm: |
+      ---
+      name: 001
+    100.helm: |
+      ---
+      name: 100
+  manifests:
+  - manifest:
+      name: 001
+    values:
+      a: 001
+  - metadata:
+      name: 010
+    kind: Pod
+  - manifest:
+      name: 100
+    values: {}
+- desc: separate in subdirs
+  files:
+    hoge/hoge.helm: |
+      name: hoge
+    hoge/hoge.values.yaml: |
+      hoge: True
+    hoge.values.yaml: |
+      hoge: False
+    foo/foo.yaml: |
+      kind: Pod
+    bar.yaml: |
+      kind: Pod
+  manifests:
+  - manifest:
+      name: hoge
+    values:
+      hoge: True
+  - kind: Pod
+  - kind: Pod
