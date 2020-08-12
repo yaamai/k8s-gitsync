@@ -204,7 +204,7 @@ class K8SOperator():
 # if .helm, check values
 
 def _get_files_in_samedir(paths: Iterable[Path], filepath: Path, pattern: re.Pattern) -> List[Path]:
-    dir_files = [p for p in paths if p.parents == filepath.parents]
+    dir_files = [p for p in paths if list(p.parents) == list(filepath.parents)]
     return [p for p in dir_files if pattern.match(str(p))]
 
 

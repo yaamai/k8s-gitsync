@@ -118,6 +118,8 @@ test_recursive_load:
         name: hoge
         version: 1.0.0
         repo: https://hoge.internal
+    hoge.values.yaml: |
+      a: 100
   manifests:
   - manifest:
       name: hoge
@@ -126,7 +128,8 @@ test_recursive_load:
         name: hoge
         version: 1.0.0
         repo: https://hoge.internal
-    values: {}
+    values:
+      a: 100
 
 
 
