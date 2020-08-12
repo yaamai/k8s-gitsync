@@ -1,7 +1,7 @@
 FROM python:3.8.2-alpine
 ARG ARCH=amd64
 RUN apk add --virtual build-dep build-base &&\
-    pip install flake8 autopep8 mypy pylint &&\
+    pip install flake8 autopep8 mypy pylint reorder-python-imports black autopep8 &&\
     apk del build-dep && rm -rf /var/cache/apk/* && rm -rf /root/.cache
 RUN apk add --update python3 curl &&\
     curl -Lo helm.tar.gz https://get.helm.sh/helm-v3.0.0-linux-$ARCH.tar.gz &&\

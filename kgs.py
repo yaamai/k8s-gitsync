@@ -1,13 +1,23 @@
-from dataclasses import dataclass, field
 import hashlib
-from typing import List, Type
-from typing import Final
-from typing import TypeVar, Generic
-from subprocess import Popen, PIPE
 import json
+import re
+from collections import OrderedDict
+from dataclasses import dataclass
+from dataclasses import field
+from pathlib import Path
+from subprocess import PIPE
+from subprocess import Popen
+from typing import Final
+from typing import Generic
+from typing import Iterable
+from typing import List
+from typing import Optional
+from typing import Type
+from typing import TypeVar
+
 import yaml
 from dataclasses_json import dataclass_json
-
+from typing_extensions import Protocol
 
 KGS_DEFAULT_NS: Final[str] = "default"
 LAST_APPLIED_KEY: Final[str] = "k8s-gitsync/last-applied-confighash"
@@ -29,9 +39,37 @@ def _safe_get(d: dict, *args: str, default=None):
     return r
 
 
+class Manifest(Protocol):
+    def get_id(self) -> str:
+        ...
+
+
 @dataclass_json
 @dataclass
-class K8SManifest():
+class HelmManifest(Manifest):
+    data: dict = field(default_factory=dict)  # , repr=False)
+    values: dict = field(default_factory=dict)  # , repr=False)
+
+    @classmethod
+    def parse_dict(cls: Type['HelmManifest'], d: dict) -> 'HelmManifest':
+        return HelmManifest(data=d["manifest"], values=d["values"])
+
+    @classmethod
+    def parse_file(cls: Type['HelmManifest'], helm_file: str, values_files: List[str]) -> List['HelmManifest']:
+        d: dict = {"manifest": {}, "values": {}}
+
+        with open(helm_file) as f:
+            d["manifest"].update(yaml.safe_load(f))
+        for values_file in values_files:
+            with open(values_file) as f:
+                d["values"].update(yaml.safe_load(f))
+
+        return [cls.parse_dict(d)]
+
+
+@dataclass_json
+@dataclass
+class K8SManifest(Manifest):
     data: dict = field(default_factory=dict)  # , repr=False)
 
     def get_id(self):
@@ -114,6 +152,9 @@ class Result(Generic[T]):
     def error(detail: dict):
         return Result[T](None, detail)  # type:ignore
 
+    @staticmethod
+    def chain(result: "Result[T]"):
+        return Result[T](None, result.detail)  # type:ignore
 
 
 class K8SOperator():
@@ -139,18 +180,126 @@ class K8SOperator():
         cmd = ["kubectl", "create", "namespace", namespace]
         cmd_exec(cmd)
 
-    def create_or_update(self, manifest: K8SManifest, dry_run: bool):
+    def create_or_update(self, manifest: K8SManifest, dry_run: bool) -> Result[dict]:
         result = self.get_state(manifest)
-        if not (_ := result.get()):  # pylint: disable=superfluous-parens
-            return
+        if not (state := result.get()):  # pylint: disable=superfluous-parens
+            return Result.chain(result)
+
+        if state.is_updated():
+            return Result({"updated": True})
 
         if dry_run:
-            return
+            return Result({"dry_run": True})
 
         self._ensure_namespace(manifest.get_namespace())
 
         cmd = ["kubectl", "apply", "-f", "-"]
         _, _, _ = cmd_exec(cmd, stdin=yaml.dump(manifest.data).encode())
+
+        return Result({})
+
+# def get_files_in_same_dir
+# def _try_parse_helm():
+# if values.yaml, check .helm
+# if .helm, check values
+
+def _get_files_in_samedir(paths: Iterable[Path], filepath: Path, pattern: re.Pattern) -> List[Path]:
+    dir_files = [p for p in paths if p.parents == filepath.parents]
+    return [p for p in dir_files if pattern.match(str(p))]
+
+
+HELM_MANIFEST_FILE_PATTERN: re.Pattern = re.compile(r"(.*)\.helm$")
+HELM_MANIFEST_VALUES_FILE_PATTERN: re.Pattern = re.compile(r"(.*)\.values\.ya?ml$")
+def _try_parse_helm(filepath: Path, paths: 'OrderedDict[Path, Optional[bool]]') -> Optional[List[HelmManifest]]:
+    breakpoint()
+    match_helm = HELM_MANIFEST_FILE_PATTERN.match(str(filepath))
+    match_values = HELM_MANIFEST_VALUES_FILE_PATTERN.match(str(filepath))
+    if not match_helm and not match_values:
+        return None
+
+    helm_file: Path
+    values_files: List[Path]
+    if match_helm:
+        helm_file = filepath
+        values_files = _get_files_in_samedir(paths, filepath, HELM_MANIFEST_VALUES_FILE_PATTERN)
+    if match_values:
+        _get_files_in_samedir(paths, filepath, HELM_MANIFEST_FILE_PATTERN)
+        values_files = _get_files_in_samedir(paths, filepath, HELM_MANIFEST_VALUES_FILE_PATTERN)
+
+    return HelmManifest.parse_file(str(helm_file), [str(p) for p in values_files])
+
+
+K8S_MANIFEST_FILE_PATTERN: re.Pattern = re.compile(r"(.*)\.ya?ml$")
+def _try_parse_k8s(filepath: Path, paths: 'OrderedDict[Path, Optional[bool]]') -> Optional[List[K8SManifest]]:
+    m = K8S_MANIFEST_FILE_PATTERN.match(str(filepath))
+    if not m:
+        return None
+
+    manifest = K8SManifest.parse_file(str(filepath))
+    paths[filepath] = True
+    return manifest
+
+
+def load_recursively(repo_path: str) -> List[Manifest]:
+    # NOTE: mypy OrderedDict not supported correctly
+    paths: 'OrderedDict[Path, Optional[bool]]' = OrderedDict()
+    for path in Path(repo_path).glob("**/*"):
+        paths[path] = None
+
+    manifest_list: List[Manifest] = []
+    for filepath, parsed in paths.items():
+        if parsed:
+            continue
+
+        k8s_result = _try_parse_k8s(filepath, paths)
+        if k8s_result:
+            manifest_list.extend(k8s_result)
+            continue
+
+        result = _try_parse_helm(filepath, paths)
+        if result:
+            manifest_list.extend(result)
+            continue
+
+    return manifest_list
+"""
+def _exclude_directory_contains_file(path_list: List[Path], pattern: re.Pattern) -> List[Path]:
+    contains_dir_list = [p for p in path_list if pattern.match(p.name)]
+
+    result = []
+    for path in path_list:
+        is_path_contain_file = [contains_dir.parent in path.parents for contains_dir in contains_dir_list]
+        if not any(is_path_contain_file):
+            result.append(path)
+
+    return result
+
+
+def _exclude_helm_manifest(path_list: List[Path], helm_manifests: List[HelmManifest]) -> List[Path]:
+    helm_manifest_file_list: List[str] = []
+    for m in helm_manifests:
+        helm_manifest_file_list.extend(m.get_filepath())
+
+    return list(filter(lambda p: str(p) not in helm_manifest_file_list, path_list))
+
+
+def load_recursively(path: str) -> List[Manifest]:
+    path_list = list(Path(path).glob("**/*"))
+
+    # exclude helm chart directory
+    path_list = _exclude_directory_contains_file(path_list, re.compile("Chart\\.yaml"))
+
+    # load manifests
+    helm_manifests = HelmManifest.parse_file(path_list)
+
+    path_list = _exclude_helm_manifest(path_list, helm_manifests)
+    k8s_manifests = K8SManifest.load(path_list)
+
+    manifest_list: List[Manifest] = []
+    manifest_list.extend(helm_manifests)
+    manifest_list.extend(k8s_manifests)
+    return manifest_list
+"""
 
 
 if __name__ == '__main__':

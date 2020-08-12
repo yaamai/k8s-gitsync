@@ -20,53 +20,122 @@ test_manifest_load:
             k8s-gitsync/managed: "true"
 
 test_operator_get_state:
-  - desc: normal
-    in: {"metadata": {"name": "a", "namespace": "b"}, "kind": "Pod"}
-    expect: ['kubectl', '-n', 'b', 'get', 'Pod', 'a', '-o', 'json']
-  - desc: missing namespace
-    in: {"metadata": {"name": "a"}, "kind": "Pod"}
-    expect: ['kubectl', '-n', 'default', 'get', 'Pod', 'a', '-o', 'json']
-  - desc: missing name
-    in: {"metadata": {}, "kind": "Pod"}
-    expect: []
-    return: null
+- desc: normal
+  in: {"metadata": {"name": "a", "namespace": "b"}, "kind": "Pod"}
+  expect: ['kubectl', '-n', 'b', 'get', 'Pod', 'a', '-o', 'json']
+- desc: missing namespace
+  in: {"metadata": {"name": "a"}, "kind": "Pod"}
+  expect: ['kubectl', '-n', 'default', 'get', 'Pod', 'a', '-o', 'json']
+- desc: missing name
+  in: {"metadata": {}, "kind": "Pod"}
+  expect: []
+  return:
+    msg: "invalid manifest"
 
 test_operator_create_or_update:
-  - desc: normal state does not synced
-    cmd_exec:
-    - [!bytes "{}", !bytes "{}", 0]
-    - [!bytes "{}", !bytes "{}", 0]
-    - [!bytes "{}", !bytes "{}", 0]
-    in: {"metadata": {"name": "a", "namespace": "b"}, "kind": "Pod"}
-    expect:
-    - args: [['kubectl', '-n', 'b', 'get', 'Pod', 'a', '-o', 'json']]
-      kwargs: {}
-    - args: [['kubectl', 'create', 'namespace', 'b']]
-      kwargs: {}
-    - args: [['kubectl', 'apply', '-f', '-']]
-      kwargs:
-        stdin: !bytes |
-          kind: Pod
-          metadata:
-            annotations:
-              k8s-gitsync/last-applied-confighash: eedf1596e62bc950fd41873f337e58dea4a665c0025e1041ea5ff508b6ec14b9
-            labels:
-              k8s-gitsync/managed: 'true'
-            name: a
-            namespace: b
-  - desc: normal state synced
-    cmd_exec:
-    - - !bytes |
-        {
-          "metadata": {
-            "annotations": {
-              "k8s-gitsync/last-applied-confighash": "eedf1596e62bc950fd41873f337e58dea4a665c0025e1041ea5ff508b6ec14b9"
-            }
+- desc: normal state does not synced
+  cmd_exec:
+  - [!bytes "{}", !bytes "{}", 0]
+  - [!bytes "{}", !bytes "{}", 0]
+  - [!bytes "{}", !bytes "{}", 0]
+  in: {"metadata": {"name": "a", "namespace": "b"}, "kind": "Pod"}
+  expect:
+  - args: [['kubectl', '-n', 'b', 'get', 'Pod', 'a', '-o', 'json']]
+    kwargs: {}
+  - args: [['kubectl', 'create', 'namespace', 'b']]
+    kwargs: {}
+  - args: [['kubectl', 'apply', '-f', '-']]
+    kwargs:
+      stdin: !bytes |
+        kind: Pod
+        metadata:
+          annotations:
+            k8s-gitsync/last-applied-confighash: eedf1596e62bc950fd41873f337e58dea4a665c0025e1041ea5ff508b6ec14b9
+          labels:
+            k8s-gitsync/managed: 'true'
+          name: a
+          namespace: b
+- desc: normal state synced
+  cmd_exec:
+  - - !bytes |
+      {
+        "metadata": {
+          "annotations": {
+            "k8s-gitsync/last-applied-confighash": "eedf1596e62bc950fd41873f337e58dea4a665c0025e1041ea5ff508b6ec14b9"
           }
         }
-      - !bytes "{}"
-      - 0
-    in: {"metadata": {"name": "a", "namespace": "b"}, "kind": "Pod"}
-    expect:
-    - args: [['kubectl', '-n', 'b', 'get', 'Pod', 'a', '-o', 'json']]
-      kwargs: {}
+      }
+    - !bytes "{}"
+    - 0
+  in: {"metadata": {"name": "a", "namespace": "b"}, "kind": "Pod"}
+  expect:
+  - args: [['kubectl', '-n', 'b', 'get', 'Pod', 'a', '-o', 'json']]
+    kwargs: {}
+
+test_recursive_load:
+- desc: empty
+  files: {}
+  manifests: []
+- desc: k8s manifest
+  files:
+    hoge.yaml: |
+      ---
+      metadata:
+        name: a
+        namespace: b
+      kind: Pod
+  manifests:
+  - metadata:
+      name: a
+      namespace: b
+    kind: Pod
+- desc: k8s manifest load order
+  files:
+    001-hoge.yaml: |
+      ---
+      metadata:
+        name: 001
+      kind: Pod
+    100-hoge.yaml: |
+      ---
+      metadata:
+        name: 100
+      kind: Pod
+  manifests:
+  - metadata:
+      name: 001
+    kind: Pod
+  - metadata:
+      name: 100
+    kind: Pod
+- desc: helm manifest
+  files:
+    hoge.helm: |
+      ---
+      name: hoge
+      namespace: hoge
+      chart:
+        name: hoge
+        version: 1.0.0
+        repo: https://hoge.internal
+  manifests:
+  - manifest:
+      name: hoge
+      namespace: hoge
+      chart:
+        name: hoge
+        version: 1.0.0
+        repo: https://hoge.internal
+    values: {}
+
+
+
+
+
+
+
+
+
+
+
+
