@@ -45,7 +45,7 @@ class Manifest(Protocol):
         ...
 
     @classmethod
-    def parse_dict(cls: Type['Manifest'], d: dict) -> 'Manifest':
+    def parse_dict(cls: Type["Manifest"], d: dict) -> "Manifest":
         ...
 
 
@@ -55,12 +55,21 @@ class HelmManifest(Manifest):
     data: dict = field(default_factory=dict)  # , repr=False)
     values: dict = field(default_factory=dict)  # , repr=False)
 
+    def get_name(self) -> str:
+        return _safe_get(self.data, "name")
+
+    def get_namespace(self) -> str:
+        return _safe_get(self.data, "namespace")
+
+    def get_chart(self) -> str:
+        return _safe_get(self.data, "chart")
+
     @classmethod
-    def parse_dict(cls: Type['HelmManifest'], d: dict) -> 'HelmManifest':
+    def parse_dict(cls: Type["HelmManifest"], d: dict) -> "HelmManifest":
         return HelmManifest(data=d["manifest"], values=d["values"])
 
     @classmethod
-    def parse_file(cls: Type['HelmManifest'], helm_file: str, values_files: List[str]) -> List['HelmManifest']:
+    def parse_file(cls: Type["HelmManifest"], helm_file: str, values_files: List[str]) -> List["HelmManifest"]:
         d: dict = {"manifest": {}, "values": {}}
 
         with open(helm_file) as f:
@@ -105,15 +114,15 @@ class K8SManifest(Manifest):
         return data
 
     @classmethod
-    def parse_dict(cls: Type['K8SManifest'], d: dict) -> 'K8SManifest':
+    def parse_dict(cls: Type["K8SManifest"], d: dict) -> "K8SManifest":
         return K8SManifest(data=cls._annotate_manifest_data(d))
 
     @classmethod
-    def parse_array_of_dict(cls: Type['K8SManifest'], ary: List[dict]) -> List['K8SManifest']:
+    def parse_array_of_dict(cls: Type["K8SManifest"], ary: List[dict]) -> List["K8SManifest"]:
         return [cls.parse_dict(elm) for elm in ary]
 
     @classmethod
-    def parse_file(cls: Type['K8SManifest'], filepath: str) -> List['K8SManifest']:
+    def parse_file(cls: Type["K8SManifest"], filepath: str) -> List["K8SManifest"]:
         with open(filepath) as f:
             # some k8s manifest file has empty document
             documents = yaml.safe_load_all(f)
@@ -127,7 +136,7 @@ class K8SManifest(Manifest):
 
 @dataclass_json
 @dataclass
-class K8SState():
+class K8SState:
     m: K8SManifest
     state: dict = field(default_factory=dict)
 
@@ -137,7 +146,7 @@ class K8SState():
         return current == expect
 
 
-T = TypeVar('T')
+T = TypeVar("T")
 
 
 class Result(Generic[T]):
@@ -162,7 +171,7 @@ class Result(Generic[T]):
         return Result[T](None, result.detail)  # type:ignore
 
 
-class K8SOperator():
+class K8SOperator:
     @staticmethod
     def get_state(manifest: K8SManifest) -> Result[K8SState]:
         namespace = manifest.get_namespace()
@@ -203,10 +212,80 @@ class K8SOperator():
 
         return Result({})
 
-# def get_files_in_same_dir
-# def _try_parse_helm():
-# if values.yaml, check .helm
-# if .helm, check values
+
+class HelmClient:
+    pass
+
+
+@dataclass_json
+@dataclass
+class HelmState:
+    m: HelmManifest
+    state: dict = field(default_factory=dict)
+
+    def _calc_helm_values_hash(self, values_dict):
+        # deep clone and remove managed key
+        values = json.loads(json.dumps(values_dict))
+        values.pop(KGS_MANAGED_KEY, None)
+        json_str = json.dumps(values, sort_keys=True)
+        return hashlib.sha256(json_str.encode()).hexdigest()
+
+    def is_updated(self) -> bool:
+        current = _safe_get(self.state, "metadata", "annotations", LAST_APPLIED_KEY)
+        expect = _safe_get(self.m.data, "metadata", "annotations", LAST_APPLIED_KEY)
+        return current == expect
+
+
+class HelmOperator:
+    def __init__(self, helm_binary_path="helm", kubectl_binary_path="kubectl"):
+        self.helm_binary_path = helm_binary_path
+        self.kubectl_binary_path = kubectl_binary_path
+
+    def get_release_list(self):
+        cmd = [self.helm_binary_path, "list", "--output", "json", "--all-namespaces"]
+        outs, _, _ = cmd_exec(cmd)
+        return json.loads(outs.decode())
+
+    def get_values(self, namespace: str, release_name: str) -> Result[dict]:
+        cmd = [
+            self.helm_binary_path,
+            "-n",
+            namespace,
+            "get",
+            "values",
+            release_name,
+            "--output",
+            "json",
+        ]
+        outs, errs, rc = cmd_exec(cmd)
+        values = json.loads(outs.decode())
+
+        if ("release: not found" in errs.decode()) and rc != 0:
+            return Result({})
+        if values is None:
+            return Result({})
+        if rc != 0:
+            return Result.error({"msg": "unexpected return code", "raw": errs.decode()})
+
+        return Result(values)
+
+    def get_state(self, manifest: HelmManifest) -> Result[HelmState]:
+        breakpoint()
+        namespace = manifest.get_namespace()
+        name = manifest.get_name()
+        chart = manifest.get_chart()
+
+        result = self.get_values(namespace, name)
+        if not (values := result.get()):  # pylint: disable=superfluous-parens
+            return Result.chain(result)
+        state = {
+            "release_name": manifest.get_name(),
+            "chart": chart,
+            "namespace": namespace,
+            "_values_data": values,
+        }
+        return Result(HelmState(m=manifest, state=state))
+
 
 def _get_files_in_samedir(paths: Iterable[Path], filepath: Path, condition: Callable[[str], bool]) -> List[Path]:
     dir_files = [p for p in paths if list(p.parents) == list(filepath.parents)]
@@ -217,6 +296,7 @@ def _get_files_in_samedir_pattern(paths: Iterable[Path], filepath: Path, pattern
     def _(path: str) -> bool:
         m = pattern.match(path)
         return m is not None and m.group(1) == name
+
     return _get_files_in_samedir(paths, filepath, _)
 
 
@@ -227,9 +307,12 @@ def _unwrap_any(*args: Optional[re.Match]) -> re.Match:
     # this function expect least one of args must have value
     raise Exception()
 
+
 HELM_MANIFEST_FILE_PATTERN: re.Pattern = re.compile(r"(.*)\.helm$")
 HELM_MANIFEST_VALUES_FILE_PATTERN: re.Pattern = re.compile(r"(.*)\.values\.ya?ml$")
-def _try_parse_helm(filepath: Path, paths: 'OrderedDict[Path, Optional[bool]]') -> Optional[List[HelmManifest]]:
+
+
+def _try_parse_helm(filepath: Path, paths: "OrderedDict[Path, Optional[bool]]") -> Optional[List[HelmManifest]]:
     match_helm = HELM_MANIFEST_FILE_PATTERN.match(str(filepath))
     match_values = HELM_MANIFEST_VALUES_FILE_PATTERN.match(str(filepath))
     if not match_helm and not match_values:
@@ -255,7 +338,9 @@ def _try_parse_helm(filepath: Path, paths: 'OrderedDict[Path, Optional[bool]]') 
 
 
 K8S_MANIFEST_FILE_PATTERN: re.Pattern = re.compile(r"(.*)\.ya?ml$")
-def _try_parse_k8s(filepath: Path, paths: 'OrderedDict[Path, Optional[bool]]') -> Optional[List[K8SManifest]]:
+
+
+def _try_parse_k8s(filepath: Path, paths: "OrderedDict[Path, Optional[bool]]") -> Optional[List[K8SManifest]]:
     m = K8S_MANIFEST_FILE_PATTERN.match(str(filepath))
     if not m:
         return None
@@ -267,7 +352,7 @@ def _try_parse_k8s(filepath: Path, paths: 'OrderedDict[Path, Optional[bool]]') -
 
 def load_recursively(repo_path: str) -> List[Manifest]:
     # path -> None(not processed), False(skipped), True(processed)
-    paths: 'OrderedDict[Path, Optional[bool]]' = OrderedDict()
+    paths: "OrderedDict[Path, Optional[bool]]" = OrderedDict()
     for path in Path(repo_path).glob("**/*"):
         paths[path] = None
 
@@ -286,12 +371,15 @@ def load_recursively(repo_path: str) -> List[Manifest]:
             manifest_list.extend(k8s_result)
             continue
 
-
     return manifest_list
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     breakpoint()
-    mf = K8SManifest.parse_file("test.yaml")
-    oper = K8SOperator()
-    oper.create_or_update(mf[0], dry_run=False)
+    mf = HelmManifest.parse_file("test.helm", [])
+    oper = HelmOperator()
+    oper.create_or_update()
+
+    # mf = K8SManifest.parse_file("test.yaml")
+    # oper = K8SOperator()
+    # oper.create_or_update(mf[0], dry_run=False)

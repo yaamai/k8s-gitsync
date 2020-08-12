@@ -32,6 +32,55 @@ test_operator_get_state:
   return:
     msg: "invalid manifest"
 
+test_operator_get_state_helm:
+- desc: normal
+  cmd_exec:
+  - [!bytes "{}", !bytes "{}", 0]
+  in:
+    manifest:
+      name: hoge
+      namespace: hoge
+      chart:
+        name: hoge
+        version: 1.0.0
+        repo: https://hoge.internal
+    values:
+      a: 100
+  expect:
+  - args: [['helm', '-n', 'hoge', 'get', 'values', 'hoge', '--output', 'json']]
+    kwargs: {}
+- desc: state not found
+  cmd_exec:
+    - [!bytes "{}", !bytes "Error: release: not found", 1]
+  in:
+    manifest:
+      name: hoge
+      namespace: hoge
+      chart:
+        name: hoge
+        version: 1.0.0
+        repo: https://hoge.internal
+    values:
+      a: 100
+  expect:
+  - args: [['helm', '-n', 'hoge', 'get', 'values', 'hoge', '--output', 'json']]
+    kwargs: {}
+  return:
+    result: ""
+    detail: ""
+    #- desc: missing namespace
+    #  cmd_exec:
+    #  - [!bytes "{}", !bytes "{}", 0]
+    #  in: {"metadata": {"name": "a"}, "kind": "Pod"}
+    #  expect: ['kubectl', '-n', 'default', 'get', 'Pod', 'a', '-o', 'json']
+    #- desc: missing name
+    #  cmd_exec:
+    #  - [!bytes "{}", !bytes "{}", 0]
+    #  in: {"metadata": {}, "kind": "Pod"}
+    #  expect: []
+    #  return:
+    #    msg: "invalid manifest"
+
 test_operator_create_or_update:
 - desc: normal state does not synced
   cmd_exec:
