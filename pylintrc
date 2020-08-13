@@ -310,7 +310,8 @@ good-names=i,
            T,
            maxDiff,
            id,
-           td
+           td,
+           ok
 
 # Include a hint for the correct naming format with invalid-name.
 include-naming-hint=no

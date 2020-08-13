@@ -66,8 +66,8 @@ test_operator_get_state_helm:
   - args: [['helm', '-n', 'hoge', 'get', 'values', 'hoge', '--output', 'json']]
     kwargs: {}
   return:
-    result: ""
-    detail: ""
+    result: null
+    detail: {msg: "notfound"}
     #- desc: missing namespace
     #  cmd_exec:
     #  - [!bytes "{}", !bytes "{}", 0]
