@@ -7,10 +7,10 @@ from typing import Type
 import yaml
 from dataclasses_json import DataClassJsonMixin
 
+from kgs.common import Manifest
 from kgs.consts import KGS_DEFAULT_NS
 from kgs.consts import KGS_MANAGED_KEY
 from kgs.consts import LAST_APPLIED_KEY
-from kgs.manifests.common import Manifest
 from kgs.utils import _safe_get
 
 

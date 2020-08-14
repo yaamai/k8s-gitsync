@@ -6,7 +6,7 @@ from typing import Type
 import yaml
 from dataclasses_json import DataClassJsonMixin
 
-from kgs.manifests.common import Manifest
+from kgs.common import Manifest
 from kgs.utils import _safe_get
 
 
@@ -15,14 +15,23 @@ class HelmManifest(Manifest, DataClassJsonMixin):
     data: dict = field(default_factory=dict)  # , repr=False)
     values: dict = field(default_factory=dict)  # , repr=False)
 
+    def get_id(self) -> str:
+        return f'helm.{self.data["namespace"]}.{self.data["name"]}'
+
+    def get_kind(self) -> str:
+        return "helm"
+
     def get_name(self) -> str:
         return _safe_get(self.data, "name")
 
     def get_namespace(self) -> str:
         return _safe_get(self.data, "namespace")
 
-    def get_chart(self) -> str:
+    def get_chart(self) -> dict:
         return _safe_get(self.data, "chart")
+
+    def get_values(self) -> dict:
+        return self.values
 
     @classmethod
     def parse_dict(cls: Type["HelmManifest"], d: dict) -> "HelmManifest":

@@ -15,3 +15,10 @@ def _safe_get(d: dict, *args: str, default=None):
             return default
         r = r[k]
     return r
+
+
+def probe_k8s():
+    _, _, rc = cmd_exec(["kubectl", "version"])
+    if rc == 0:
+        return True
+    return False

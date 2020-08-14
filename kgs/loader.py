@@ -6,7 +6,7 @@ from typing import Iterable
 from typing import List
 from typing import Optional
 
-from kgs.manifests.common import Manifest
+from kgs.common import Manifest
 from kgs.manifests.helm import HelmManifest
 from kgs.manifests.k8s import K8SManifest
 
