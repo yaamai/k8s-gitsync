@@ -1,3 +1,5 @@
+import logging
+import os
 from subprocess import PIPE
 from subprocess import Popen
 
@@ -22,3 +24,19 @@ def probe_k8s():
     if rc == 0:
         return True
     return False
+
+
+def get_logger(name):
+    formatter = logging.Formatter("%(asctime)s %(levelname)s %(message)s", "%Y/%m/%d %H:%M:%S")
+    handler = logging.StreamHandler()
+    handler.setFormatter(formatter)
+    logger = logging.getLogger(name)
+    logger.addHandler(handler)
+
+    loglevel = os.environ.get("KGS_LOG_LEVEL", None)
+    if loglevel is not None:
+        logger.setLevel(getattr(logging, loglevel))
+    else:
+        logger.setLevel(logging.INFO)
+
+    return logger

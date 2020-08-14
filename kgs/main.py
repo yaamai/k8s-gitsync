@@ -9,12 +9,16 @@ from kgs.operators.helm import HelmOperator
 from kgs.operators.k8s import K8SOperator
 
 
+logger = utils.get_logger(__name__)
+
+
 def upgrade_or_install(conf):
     # probe k8s
     if not utils.probe_k8s():
         sys.exit(1)
 
     manifests = loader.load_recursively(conf.repo)
+    logger.info("Loaded manifests:\n{}".format("\n".join(["    {}".format(str(m)) for m in manifests])))
 
     # prepare operator
     operator_map = {}
