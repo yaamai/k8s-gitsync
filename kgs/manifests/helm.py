@@ -4,15 +4,14 @@ from typing import List
 from typing import Type
 
 import yaml
-from dataclasses_json import dataclass_json
+from dataclasses_json import DataClassJsonMixin
 
 from kgs.manifests.common import Manifest
 from kgs.utils import _safe_get
 
 
-@dataclass_json
 @dataclass
-class HelmManifest(Manifest):
+class HelmManifest(Manifest, DataClassJsonMixin):
     data: dict = field(default_factory=dict)  # , repr=False)
     values: dict = field(default_factory=dict)  # , repr=False)
 
@@ -27,7 +26,7 @@ class HelmManifest(Manifest):
 
     @classmethod
     def parse_dict(cls: Type["HelmManifest"], d: dict) -> "HelmManifest":
-        return HelmManifest(data=d["manifest"], values=d["values"])
+        return HelmManifest(data=d.get("manifest", {}), values=d.get("values", {}))
 
     @classmethod
     def parse_file(cls: Type["HelmManifest"], helm_file: str, values_files: List[str]) -> List["HelmManifest"]:

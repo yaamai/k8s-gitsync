@@ -2,11 +2,11 @@ import json
 
 import yaml
 
+from kgs import utils
 from kgs.manifests.k8s import K8SManifest
 from kgs.result import Result
 from kgs.result import ResultKind
 from kgs.states.k8s import K8SState
-from kgs.utils import cmd_exec
 
 
 class K8SOperator:
@@ -19,7 +19,7 @@ class K8SOperator:
             return Result.err({"msg": "invalid manifest"})
 
         cmd = ["kubectl", "-n", namespace, "get", kind, name, "-o", "json"]
-        outs, errs, rc = cmd_exec(cmd)
+        outs, errs, rc = utils.cmd_exec(cmd)
         if ("(NotFound):" in errs.decode()) and rc != 0:
             return Result.err({"msg": "state not found"}, ResultKind.notfound)
 
@@ -31,7 +31,7 @@ class K8SOperator:
     @staticmethod
     def _ensure_namespace(namespace):
         cmd = ["kubectl", "create", "namespace", namespace]
-        return cmd_exec(cmd)
+        return utils.cmd_exec(cmd)
 
     def create_or_update(self, manifest: K8SManifest, dry_run: bool):
         state, _, [is_err, notfound] = self.get_state(manifest).chk(ResultKind.notfound)
@@ -47,6 +47,6 @@ class K8SOperator:
         self._ensure_namespace(manifest.get_namespace())
 
         cmd = ["kubectl", "apply", "-f", "-"]
-        _, _, _ = cmd_exec(cmd, stdin=yaml.dump(manifest.data).encode())
+        _, _, _ = utils.cmd_exec(cmd, stdin=yaml.dump(manifest.data).encode())
 
         return

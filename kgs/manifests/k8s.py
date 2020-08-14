@@ -5,7 +5,7 @@ from typing import List
 from typing import Type
 
 import yaml
-from dataclasses_json import dataclass_json
+from dataclasses_json import DataClassJsonMixin
 
 from kgs.consts import KGS_DEFAULT_NS
 from kgs.consts import KGS_MANAGED_KEY
@@ -14,9 +14,8 @@ from kgs.manifests.common import Manifest
 from kgs.utils import _safe_get
 
 
-@dataclass_json
 @dataclass
-class K8SManifest(Manifest):
+class K8SManifest(Manifest, DataClassJsonMixin):
     data: dict = field(default_factory=dict)  # , repr=False)
 
     def get_id(self):

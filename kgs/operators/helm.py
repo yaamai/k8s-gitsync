@@ -1,10 +1,10 @@
 import json
 
+from kgs import utils
 from kgs.manifests.helm import HelmManifest
 from kgs.result import Result
 from kgs.result import ResultKind
 from kgs.states.helm import HelmState
-from kgs.utils import cmd_exec
 
 
 class HelmOperator:
@@ -14,7 +14,7 @@ class HelmOperator:
 
     def get_release_list(self):
         cmd = [self.helm_binary_path, "list", "--output", "json", "--all-namespaces"]
-        outs, _, _ = cmd_exec(cmd)
+        outs, _, _ = utils.cmd_exec(cmd)
         return json.loads(outs.decode())
 
     def get_values(self, namespace: str, release_name: str) -> Result[dict]:
@@ -28,7 +28,7 @@ class HelmOperator:
             "--output",
             "json",
         ]
-        outs, errs, rc = cmd_exec(cmd)
+        outs, errs, rc = utils.cmd_exec(cmd)
         values = json.loads(outs.decode())
 
         if ("release: not found" in errs.decode()) and rc != 0:
