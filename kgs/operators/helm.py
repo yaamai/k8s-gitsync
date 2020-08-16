@@ -40,16 +40,16 @@ class HelmOperator:
         return Result.ok(values)
 
     def get_state(self, manifest: HelmManifest) -> Result[HelmState]:
-        namespace = manifest.get_namespace()
-        name = manifest.get_name()
-        chart = manifest.get_chart()
+        namespace = manifest.namespace
+        name = manifest.name
+        chart = manifest.chart
 
         values, ret, [is_err] = self.get_values(namespace, name).chk()
         if is_err:
             return Result.chain(ret)
 
         state = {
-            "release_name": manifest.get_name(),
+            "release_name": manifest.name,
             "chart": chart,
             "namespace": namespace,
             "_values_data": values,
@@ -67,39 +67,38 @@ class HelmOperator:
                 return True
         return False
 
-    def create_or_update(self, manifest: HelmManifest, dry_run: bool):
-        state, _, [is_err, notfound] = self.get_state(manifest).chk(ResultKind.notfound)
+    def create_or_update(self, manifest: HelmManifest, dry_run: bool) -> Result[dict]:
+        state, result, [is_err, notfound] = self.get_state(manifest).chk(ResultKind.notfound)
         if is_err:
-            return
+            return Result.chain(result)
 
         if not notfound and state.is_updated():
-            return
+            return Result.ok({})
 
         if dry_run:
-            return
+            return Result.ok({})
 
         cmd = []
         cmd += [self.helm_binary_path, "upgrade"]
-        cmd += ["--install", manifest.get_name()]
+        cmd += ["--install", manifest.name]
         cmd += ["--output", "json"]
         cmd += ["--create-namespace"]
-        cmd += ["--namespace", manifest.get_namespace()]
+        cmd += ["--namespace", manifest.namespace]
         cmd += ["--values", "-"]
-        cmd += ["--version", manifest.get_chart()["version"]]
-        if manifest.get_chart()["repo"] is not None and manifest.get_chart()["repo"] != "":
-            cmd += ["--repo", manifest.get_chart()["repo"]]
-        if manifest.get_chart().get("localpath") is not None and manifest.get_chart()["localpath"] != "":
-            cmd += [f"{manifest.get_chart()['localpath']}{manifest.get_chart()['name']}"]
+        cmd += ["--version", manifest.chart.version]
+        if manifest.chart.repo is not None and manifest.chart.repo != "":
+            cmd += ["--repo", manifest.chart.repo]
+        if manifest.chart.localpath is not None and manifest.chart.localpath != "":
+            cmd += [f"{manifest.chart.localpath}{manifest.chart.name}"]
         else:
-            cmd += [manifest.get_chart()["name"]]
+            cmd += [manifest.chart.name]
         outs, _, rc = utils.cmd_exec(cmd, manifest.get_values())
         if rc != 0:
-            return
-        breakpoint()
+            return Result.err({})
 
         # remove WARNING:, DEBUG: Release
         warning_log_re = re.compile(r"^(WARNING:|DEBUG:|Release).*", re.MULTILINE)
         _ = warning_log_re.sub("", outs.decode())
 
         # return json.loads(outs_json)
-        return
+        return Result.ok({})

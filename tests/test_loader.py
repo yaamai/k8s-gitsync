@@ -4,8 +4,8 @@ from pathlib import Path
 from unittest import mock
 from unittest.mock import mock_open
 
+from kgs.common import Manifest
 from kgs.loader import load_recursively
-from kgs.manifests.common import Manifest
 from kgs.manifests.helm import HelmManifest
 from kgs.manifests.k8s import K8SManifest
 from tests.utils import load_testdata
@@ -39,4 +39,4 @@ class TestManifestLoader(unittest.TestCase):
                     expected = K8SManifest.parse_dict(m)
                 else:
                     expected = HelmManifest.parse_dict(m)
-                assert expected == manifests[idx]
+                assert expected == manifests.result[idx]

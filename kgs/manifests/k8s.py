@@ -15,21 +15,31 @@ from kgs.utils import _safe_get
 
 
 @dataclass
-class K8SManifest(Manifest, DataClassJsonMixin):
-    data: dict = field(default_factory=dict)  # , repr=False)
+class _K8SManifest(Manifest, DataClassJsonMixin):
+    data: dict = field(default_factory=dict, repr=False)
+    namespace: str = field(init=False)
+    kind: str = field(init=False)
+    name: str = field(init=False)
+
+
+# To clearly declare property on dataclass,
+# define field on parent, overwrite by property in child
+class K8SManifest(_K8SManifest):
+    @property
+    def namespace(self) -> str:  # type:ignore
+        return _safe_get(self.data, "metadata", "namespace", default=KGS_DEFAULT_NS)
+
+    @property
+    def name(self) -> str:  # type:ignore
+        return _safe_get(self.data, "metadata", "name")
+
+    @property
+    def kind(self) -> str:  # type:ignore
+        return _safe_get(self.data, "kind")
 
     def get_id(self):
         namespace = self.data.get("namespace", KGS_DEFAULT_NS)
         return f'{self.data["kind"].lower()}.{namespace}.{self.data["metadata"]["name"]}'
-
-    def get_namespace(self):
-        return _safe_get(self.data, "metadata", "namespace", default=KGS_DEFAULT_NS)
-
-    def get_name(self):
-        return _safe_get(self.data, "metadata", "name")
-
-    def get_kind(self):
-        return _safe_get(self.data, "kind")
 
     @staticmethod
     def _annotate_manifest_data(data: dict) -> dict:
@@ -46,15 +56,15 @@ class K8SManifest(Manifest, DataClassJsonMixin):
         return data
 
     @classmethod
-    def parse_dict(cls: Type["K8SManifest"], d: dict) -> "K8SManifest":
+    def parse_dict(cls: Type["K8SManifest"], d: dict) -> "Manifest":
         return K8SManifest(data=cls._annotate_manifest_data(d))
 
     @classmethod
-    def parse_array_of_dict(cls: Type["K8SManifest"], ary: List[dict]) -> List["K8SManifest"]:
+    def parse_array_of_dict(cls: Type["K8SManifest"], ary: List[dict]) -> List["Manifest"]:
         return [cls.parse_dict(elm) for elm in ary]
 
     @classmethod
-    def parse_file(cls: Type["K8SManifest"], filepath: str) -> List["K8SManifest"]:
+    def parse_file(cls: Type["K8SManifest"], filepath: str) -> List["Manifest"]:
         with open(filepath) as f:
             # some k8s manifest file has empty document
             documents = yaml.safe_load_all(f)

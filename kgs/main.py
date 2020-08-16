@@ -17,7 +17,12 @@ def upgrade_or_install(conf):
     if not utils.probe_k8s():
         sys.exit(1)
 
-    manifests = loader.load_recursively(conf.repo)
+    manifests, result, [is_err] = loader.load_recursively(conf.repo).chk()
+    if is_err:
+        logger.error("")
+
+    t = ["    {:64.64}-> {}".format(str(p), str(k)) for (p, k) in result.detail["paths"].items()]
+    logger.info("Finding manifests:\n{}".format("\n".join(t)))
     logger.info("Loaded manifests:\n{}".format("\n".join(["    {}".format(str(m)) for m in manifests])))
 
     # prepare operator
