@@ -16,13 +16,12 @@ test_operator_get_state_helm:
   cmd_exec:
   - [!bytes "{}", !bytes "{}", 0]
   in:
-    manifest:
+    name: hoge
+    namespace: hoge
+    chart:
       name: hoge
-      namespace: hoge
-      chart:
-        name: hoge
-        version: 1.0.0
-        repo: https://hoge.internal
+      version: 1.0.0
+      repo: https://hoge.internal
     values:
       a: 100
   expect:
@@ -32,13 +31,12 @@ test_operator_get_state_helm:
   cmd_exec:
     - [!bytes "{}", !bytes "Error: release: not found", 1]
   in:
-    manifest:
+    name: hoge
+    namespace: hoge
+    chart:
       name: hoge
-      namespace: hoge
-      chart:
-        name: hoge
-        version: 1.0.0
-        repo: https://hoge.internal
+      version: 1.0.0
+      repo: https://hoge.internal
     values:
       a: 100
   expect:

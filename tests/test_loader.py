@@ -21,22 +21,23 @@ class TestManifestLoader(unittest.TestCase):
         testdata = self.testdata["test_recursive_load"]
 
         for td in testdata:
-            # mock open
-            def open_mock_func(td, f):
-                content = td["files"][f]
-                file_object = mock_open(read_data=content).return_value
-                file_object.__iter__.return_value = content.splitlines(True)
-                return file_object
+            with self.subTest(td["desc"]):
+                # mock open
+                def open_mock_func(td, f):
+                    content = td["files"][f]
+                    file_object = mock_open(read_data=content).return_value
+                    file_object.__iter__.return_value = content.splitlines(True)
+                    return file_object
 
-            open_mock.side_effect = partial(open_mock_func, td)
+                open_mock.side_effect = partial(open_mock_func, td)
 
-            # mock Path.glob
-            path_mock.return_value.glob.return_value = list(map(Path, td["files"].keys()))
-            manifests = load_recursively("")
-            for idx, m in enumerate(td["manifests"]):
-                expected: Manifest
-                if "kind" in m:
-                    expected = K8SManifest.parse_dict(m)
-                else:
-                    expected = HelmManifest.parse_dict(m)
-                assert expected == manifests.result[idx]
+                # mock Path.glob
+                path_mock.return_value.glob.return_value = list(map(Path, td["files"].keys()))
+                manifests = load_recursively("")
+                for idx, m in enumerate(td["manifests"]):
+                    expected: Manifest
+                    if "kind" in m:
+                        expected = K8SManifest.parse_dict(m)
+                    else:
+                        expected = HelmManifest.from_dict(m)
+                    assert expected == manifests.result[idx]

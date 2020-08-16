@@ -50,13 +50,12 @@ test_recursive_load:
       a: 200
       b: 100
   manifests:
-  - manifest:
+  - name: hoge
+    namespace: hoge
+    chart:
       name: hoge
-      namespace: hoge
-      chart:
-        name: hoge
-        version: 1.0.0
-        repo: https://hoge.internal
+      version: 1.0.0
+      repo: https://hoge.internal
     values:
       a: 100
 - desc: helm manifest order
@@ -66,16 +65,26 @@ test_recursive_load:
     001.helm: |
       ---
       name: 001
+      chart:
+        name: a
+        version: 1.1.1
     100.helm: |
       ---
       name: 100
+      chart:
+        name: a
+        version: 1.1.1
   manifests:
-  - manifest:
-      name: 001
+  - name: 001
+    chart:
+      name: a
+      version: 1.1.1
     values:
       a: 001
-  - manifest:
-      name: 100
+  - name: 100
+    chart:
+      name: a
+      version: 1.1.1
     values: {}
 - desc: helm k8s mixed
   files:
@@ -88,24 +97,37 @@ test_recursive_load:
     001.helm: |
       ---
       name: 001
+      chart:
+        name: a
+        version: 1.1.1
     100.helm: |
       ---
       name: 100
+      chart:
+        name: a
+        version: 1.1.1
   manifests:
-  - manifest:
-      name: 001
+  - name: 001
+    chart:
+      name: a
+      version: 1.1.1
     values:
       a: 001
   - metadata:
       name: 010
     kind: Pod
-  - manifest:
-      name: 100
+  - name: 100
+    chart:
+      name: a
+      version: 1.1.1
     values: {}
 - desc: separate in subdirs
   files:
     hoge/hoge.helm: |
       name: hoge
+      chart:
+        name: a
+        version: 1.1.1
     hoge/hoge.values.yaml: |
       hoge: True
     hoge.values.yaml: |
@@ -115,8 +137,10 @@ test_recursive_load:
     bar.yaml: |
       kind: Pod
   manifests:
-  - manifest:
-      name: hoge
+  - name: hoge
+    chart:
+      name: a
+      version: 1.1.1
     values:
       hoge: True
   - kind: Pod

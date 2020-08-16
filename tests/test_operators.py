@@ -60,7 +60,7 @@ class TestHelmOperator(unittest.TestCase):
                 cmd_exec.side_effect = iter(td["cmd_exec"])
 
                 oper = HelmOperator()
-                manifest = HelmManifest.parse_dict(td["in"])
+                manifest = HelmManifest.from_dict(td["in"])
                 ret = oper.get_state(manifest)
                 if "expect" in td and td.get("expect"):
                     calls = [{"args": list(l.args), "kwargs": l.kwargs} for l in cmd_exec.call_args_list]

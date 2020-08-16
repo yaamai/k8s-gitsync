@@ -22,5 +22,12 @@ test_k8s_manifest_load:
 
 test_helm_manifest_load:
 - desc: empty
+  raise: True
   in: {}
-  expect: {}
+- desc: minimal
+  in:
+    name: hoge
+    values: {}
+    chart:
+      name: a
+      version: b

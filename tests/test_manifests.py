@@ -21,6 +21,8 @@ class TestManifests(unittest.TestCase):
         testdata = self.testdata["test_helm_manifest_load"]
         for td in testdata:
             with self.subTest(td["desc"]):
-                actual = HelmManifest.parse_dict(td["in"])
-                expect = HelmManifest.from_dict(td["expect"])
-                self.assertEqual(expect, actual)
+                if "raise" in td:
+                    with self.assertRaises(KeyError):
+                        HelmManifest.from_dict(td["in"])
+                else:
+                    HelmManifest.from_dict(td["in"])
