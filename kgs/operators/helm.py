@@ -1,7 +1,10 @@
 import json
 import re
 
+import yaml
+
 from kgs import utils
+from kgs.consts import KGS_MANAGED_KEY
 from kgs.manifests.helm import HelmManifest
 from kgs.result import Result
 from kgs.result import ResultKind
@@ -13,10 +16,17 @@ class HelmOperator:
         self.helm_binary_path = helm_binary_path
         self.kubectl_binary_path = kubectl_binary_path
 
-    def get_release_list(self):
+    def get_release_list(self) -> dict:
         cmd = [self.helm_binary_path, "list", "--output", "json", "--all-namespaces"]
         outs, _, _ = utils.cmd_exec(cmd)
         return json.loads(outs.decode())
+
+    def get_release(self, namespace: str, name: str) -> Result[dict]:
+        release_list = self.get_release_list()
+        for e in release_list:
+            if e["namespace"] == namespace and e["name"] == name:
+                return Result.ok(e)
+        return Result.err({}, ResultKind.notfound)
 
     def get_values(self, namespace: str, release_name: str) -> Result[dict]:
         cmd = [
@@ -42,37 +52,33 @@ class HelmOperator:
     def get_state(self, manifest: HelmManifest) -> Result[HelmState]:
         namespace = manifest.namespace
         name = manifest.name
-        chart = manifest.chart
+
+        release, ret, [is_err, notfound] = self.get_release(namespace, name).chk(ResultKind.notfound)
+        if is_err or notfound:
+            return Result.chain(ret)
 
         values, ret, [is_err] = self.get_values(namespace, name).chk()
         if is_err:
             return Result.chain(ret)
 
         state = {
-            "release_name": manifest.name,
-            "chart": chart,
-            "namespace": namespace,
-            "_values_data": values,
+            "name": release["name"],
+            "chart_id": release["chart"],
+            "namespace": release["namespace"],
+            "values": values,
         }
-        return Result.ok(HelmState(m=manifest, state=state))
+        return Result.ok(HelmState(**state))
 
     def _ensure_namespace(self, namespace):
         cmd = [self.kubectl_binary_path, "create", "namespace", namespace]
         return utils.cmd_exec(cmd)
-
-    def _is_installed(self, release_name, namespace):
-        release_list = self.get_release_list()
-        for e in release_list:
-            if e["namespace"] == namespace and e["name"] == release_name:
-                return True
-        return False
 
     def create_or_update(self, manifest: HelmManifest, dry_run: bool) -> Result[dict]:
         state, result, [is_err, notfound] = self.get_state(manifest).chk(ResultKind.notfound)
         if is_err:
             return Result.chain(result)
 
-        if not notfound and state.is_updated():
+        if not notfound and state.is_updated(manifest):
             return Result.ok({})
 
         if dry_run:
@@ -92,7 +98,10 @@ class HelmOperator:
             cmd += [f"{manifest.chart.localpath}{manifest.chart.name}"]
         else:
             cmd += [manifest.chart.name]
-        outs, _, rc = utils.cmd_exec(cmd, manifest.get_values())
+
+        values = {KGS_MANAGED_KEY: {"managed": True}}
+        values.update(manifest.values)
+        outs, _, rc = utils.cmd_exec(cmd, yaml.safe_dump(values).encode())
         if rc != 0:
             return Result.err({})
 

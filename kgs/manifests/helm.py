@@ -7,6 +7,7 @@ import yaml
 from dataclasses_json import DataClassJsonMixin
 
 from kgs.common import Manifest
+from kgs.consts import KGS_DEFAULT_NS
 
 
 @dataclass
@@ -22,7 +23,7 @@ class HelmManifest(Manifest, DataClassJsonMixin):
     name: str
     chart: HelmChart
     values: dict
-    namespace: Optional[str] = None
+    namespace: str = KGS_DEFAULT_NS
 
     def get_id(self) -> str:
         return f"helm.{self.namespace}.{self.name}"
