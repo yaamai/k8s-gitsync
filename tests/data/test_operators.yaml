@@ -8,6 +8,7 @@ test_operator_get_state:
 - desc: missing name
   in: {"metadata": {}, "kind": "Pod"}
   expect: []
+  raise: True
   return:
     msg: "invalid manifest"
 

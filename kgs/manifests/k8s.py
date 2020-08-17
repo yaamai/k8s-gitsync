@@ -1,45 +1,50 @@
 import hashlib
 from dataclasses import dataclass
-from dataclasses import field
+from typing import Any
+from typing import Dict
 from typing import List
+from typing import Optional
 from typing import Type
 
 import yaml
+from dataclasses_json import CatchAll
+from dataclasses_json import dataclass_json
 from dataclasses_json import DataClassJsonMixin
+from dataclasses_json import Undefined
 
 from kgs.common import Manifest
 from kgs.consts import KGS_DEFAULT_NS
 from kgs.consts import KGS_MANAGED_KEY
 from kgs.consts import LAST_APPLIED_KEY
-from kgs.utils import _safe_get
 
 
+@dataclass_json(undefined=Undefined.INCLUDE)
 @dataclass
-class _K8SManifest(Manifest, DataClassJsonMixin):
-    data: dict = field(default_factory=dict, repr=False)
-    namespace: str = field(init=False)
-    kind: str = field(init=False)
-    name: str = field(init=False)
+class K8SMetadata:
+    name: str
+    others: CatchAll
+    namespace: str = KGS_DEFAULT_NS
 
 
 # To clearly declare property on dataclass,
 # define field on parent, overwrite by property in child
-class K8SManifest(_K8SManifest):
-    @property
-    def namespace(self) -> str:  # type:ignore
-        return _safe_get(self.data, "metadata", "namespace", default=KGS_DEFAULT_NS)
+@dataclass_json(undefined=Undefined.INCLUDE)
+@dataclass
+class K8SManifestBase(Manifest, DataClassJsonMixin):
+    kind: str
+    metadata: K8SMetadata
+    others: CatchAll
 
-    @property
-    def name(self) -> str:  # type:ignore
-        return _safe_get(self.data, "metadata", "name")
 
-    @property
-    def kind(self) -> str:  # type:ignore
-        return _safe_get(self.data, "kind")
-
+class K8SManifest(K8SManifestBase):
     def get_id(self):
-        namespace = self.data.get("namespace", KGS_DEFAULT_NS)
-        return f'{self.data["kind"].lower()}.{namespace}.{self.data["metadata"]["name"]}'
+        namespace = self.metadata.namespace
+        return f"{self.kind.lower()}.{namespace}.{self.metadata.name}"
+
+    # override dataclass-json to_dict to update annotated manifest
+    def to_dict(self, encode_json=False) -> Dict[str, Any]:
+        d = super().to_dict(encode_json=encode_json)
+        return K8SManifest._annotate_manifest_data(d)
 
     @staticmethod
     def _annotate_manifest_data(data: dict) -> dict:
@@ -56,21 +61,13 @@ class K8SManifest(_K8SManifest):
         return data
 
     @classmethod
-    def parse_dict(cls: Type["K8SManifest"], d: dict) -> "Manifest":
-        return K8SManifest(data=cls._annotate_manifest_data(d))
-
-    @classmethod
     def parse_array_of_dict(cls: Type["K8SManifest"], ary: List[dict]) -> List["Manifest"]:
-        return [cls.parse_dict(elm) for elm in ary]
+        return [cls.from_dict(elm) for elm in ary]
 
     @classmethod
     def parse_file(cls: Type["K8SManifest"], filepath: str) -> List["Manifest"]:
         with open(filepath) as f:
             # some k8s manifest file has empty document
-            documents = yaml.safe_load_all(f)
-            manifests = []
-            for document in documents:
-                if document is None or not isinstance(document, dict):
-                    continue
-                manifests.append(cls.parse_dict(document))
-        return manifests
+            documents = filter(lambda d: d is not None and isinstance(d, dict), yaml.safe_load_all(f))
+            return K8SManifest.parse_array_of_dict(list(documents))
+        return []

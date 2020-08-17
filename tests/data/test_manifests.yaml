@@ -1,15 +1,12 @@
 test_k8s_manifest_load:
 - desc: empty
   in: {}
-  expect:
-    data:
-      metadata:
-        annotations:
-          k8s-gitsync/last-applied-confighash: ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356
-        labels:
-          k8s-gitsync/managed: "true"
+  raise: True
 - desc: minimal
   in:
+    kind: hoge
+    metadata:
+      name: hoge
     a: 100
   expect:
     data:

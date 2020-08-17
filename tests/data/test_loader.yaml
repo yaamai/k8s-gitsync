@@ -134,8 +134,14 @@ test_recursive_load:
       hoge: False
     foo/foo.yaml: |
       kind: Pod
+      metadata:
+        name: a
+        namespace: b
     bar.yaml: |
       kind: Pod
+      metadata:
+        name: a
+        namespace: b
   manifests:
   - name: hoge
     chart:
@@ -144,5 +150,10 @@ test_recursive_load:
     values:
       hoge: True
   - kind: Pod
+    metadata:
+      name: a
+      namespace: b
   - kind: Pod
-
+    metadata:
+      name: a
+      namespace: b

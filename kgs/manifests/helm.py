@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-from dataclasses import field
 from typing import List
 from typing import Optional
 from typing import Type
@@ -8,7 +7,6 @@ import yaml
 from dataclasses_json import DataClassJsonMixin
 
 from kgs.common import Manifest
-from kgs.utils import _safe_get
 
 
 @dataclass

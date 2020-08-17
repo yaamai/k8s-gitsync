@@ -21,12 +21,16 @@ class TestK8SOperator(unittest.TestCase):
             with self.subTest(td["desc"]):
                 oper = K8SOperator()
                 cmd_exec.reset_mock()
-                manifest = K8SManifest.parse_dict(td["in"])
-                ret = oper.get_state(manifest)
-                if "expect" in td and td.get("expect"):
-                    cmd_exec.assert_called_with(td["expect"])
-                if "return" in td:
-                    self.assertEqual(td["return"], ret.detail)
+
+                if "raise" in td:
+                    with self.assertRaises(KeyError):
+                        HelmManifest.from_dict(td["in"])
+                        return
+                else:
+                    manifest = K8SManifest.from_dict(td["in"])
+                    oper.get_state(manifest)
+                    if "expect" in td and td.get("expect"):
+                        cmd_exec.assert_called_with(td["expect"])
 
     @mock.patch("kgs.utils.cmd_exec")
     def test_operator_create_or_update(self, cmd_exec):
@@ -38,7 +42,7 @@ class TestK8SOperator(unittest.TestCase):
                 cmd_exec.side_effect = iter(td["cmd_exec"])
 
                 oper = K8SOperator()
-                manifest = K8SManifest.parse_dict(td["in"])
+                manifest = K8SManifest.from_dict(td["in"])
                 oper.create_or_update(manifest, dry_run=False)
 
                 if "expect" in td and td.get("expect"):

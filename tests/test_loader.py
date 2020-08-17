@@ -37,7 +37,7 @@ class TestManifestLoader(unittest.TestCase):
                 for idx, m in enumerate(td["manifests"]):
                     expected: Manifest
                     if "kind" in m:
-                        expected = K8SManifest.parse_dict(m)
+                        expected = K8SManifest.from_dict(m)
                     else:
                         expected = HelmManifest.from_dict(m)
                     assert expected == manifests.result[idx]

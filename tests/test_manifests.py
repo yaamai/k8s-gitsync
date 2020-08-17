@@ -13,9 +13,11 @@ class TestManifests(unittest.TestCase):
         testdata = self.testdata["test_k8s_manifest_load"]
         for td in testdata:
             with self.subTest(td["desc"]):
-                actual = K8SManifest.parse_dict(td["in"])
-                expect = K8SManifest.from_dict(td["expect"])
-                self.assertEqual(expect, actual)
+                if "raise" in td:
+                    with self.assertRaises(KeyError):
+                        K8SManifest.from_dict(td["in"])
+                else:
+                    K8SManifest.from_dict(td["in"])
 
     def test_helm_manifest_load(self):
         testdata = self.testdata["test_helm_manifest_load"]

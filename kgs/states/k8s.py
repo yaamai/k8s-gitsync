@@ -16,5 +16,5 @@ class K8SState:
 
     def is_updated(self) -> bool:
         current = _safe_get(self.state, "metadata", "annotations", LAST_APPLIED_KEY)
-        expect = _safe_get(self.m.data, "metadata", "annotations", LAST_APPLIED_KEY)
+        expect = _safe_get(self.m.to_dict(), "metadata", "annotations", LAST_APPLIED_KEY)
         return current == expect

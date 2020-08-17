@@ -12,8 +12,8 @@ from kgs.states.k8s import K8SState
 class K8SOperator:
     @staticmethod
     def get_state(manifest: K8SManifest) -> Result[K8SState]:
-        namespace = manifest.namespace
-        name = manifest.name
+        namespace = manifest.metadata.namespace
+        name = manifest.metadata.name
         kind = manifest.kind
         if not all([namespace, name, kind]):
             return Result.err({"msg": "invalid manifest"})
@@ -44,9 +44,9 @@ class K8SOperator:
         if dry_run:
             return Result.ok({})
 
-        self._ensure_namespace(manifest.namespace)
+        self._ensure_namespace(manifest.metadata.namespace)
 
         cmd = ["kubectl", "apply", "-f", "-"]
-        _, _, _ = utils.cmd_exec(cmd, stdin=yaml.dump(manifest.data).encode())
+        _, _, _ = utils.cmd_exec(cmd, stdin=yaml.dump(manifest.to_dict()).encode())
 
         return Result.ok({})
