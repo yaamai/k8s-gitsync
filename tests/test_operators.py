@@ -70,5 +70,4 @@ class TestHelmOperator(unittest.TestCase):
                     calls = [{"args": list(l.args), "kwargs": l.kwargs} for l in cmd_exec.call_args_list]
                     assert td["expect"] == calls
                 if "return" in td:
-                    self.assertEqual(td["return"]["result"], ret.result)
-                    self.assertEqual(td["return"]["detail"], ret.detail)
+                    self.assertEqual(td["return"], ret.to_dict())

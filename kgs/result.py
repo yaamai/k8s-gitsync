@@ -1,10 +1,15 @@
 from dataclasses import dataclass
+from dataclasses import field
 from enum import Enum
 from typing import Generic
 from typing import List
 from typing import Optional
 from typing import Tuple
+from typing import Type
 from typing import TypeVar
+
+from dataclasses_json import config
+from dataclasses_json import dataclass_json
 
 T = TypeVar("T")
 
@@ -13,17 +18,25 @@ class ResultKind(Enum):
     unknown = "unknown"
     notfound = "notfound"
 
+    def __str__(self):
+        return str(self.value)
 
+    @classmethod
+    def from_str(cls: "Type[ResultKind]", s: str) -> "ResultKind":
+        return ResultKind(s)
+
+
+@dataclass_json
 @dataclass
 class Result(Generic[T]):
     result: Optional[T]
     detail: Optional[dict]
     is_err: bool
-    kind: ResultKind = ResultKind.unknown
+    kind: ResultKind = field(default=ResultKind.unknown, metadata=config(encoder=ResultKind.__str__))
 
     @staticmethod
-    def ok(result: T, detail: Optional[dict] = None) -> "Result[T]":
-        return Result[T](result, detail, False)
+    def ok(result: T, detail: Optional[dict] = None, kind: ResultKind = ResultKind.unknown) -> "Result[T]":
+        return Result[T](result, detail, False, kind)
 
     @staticmethod
     def err(detail: dict, kind: ResultKind = ResultKind.unknown) -> "Result[T]":

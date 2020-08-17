@@ -24,11 +24,11 @@ test_operator_get_state_helm:
     values:
       a: 100
   expect:
-  - args: [['helm', '-n', 'hoge', 'get', 'values', 'hoge', '--output', 'json']]
+  - args: [['helm', 'list', '--output', 'json', '--all-namespaces']]
     kwargs: {}
 - desc: state not found
   cmd_exec:
-    - [!bytes "{}", !bytes "Error: release: not found", 1]
+    - [!bytes "[]", !bytes "", 0]
   in:
     name: hoge
     namespace: hoge
@@ -39,11 +39,13 @@ test_operator_get_state_helm:
     values:
       a: 100
   expect:
-  - args: [['helm', '-n', 'hoge', 'get', 'values', 'hoge', '--output', 'json']]
+  - args: [['helm', 'list', '--output', 'json', '--all-namespaces']]
     kwargs: {}
   return:
     result: null
-    detail: {msg: "notfound"}
+    detail: {}
+    kind: notfound
+    is_err: true
     #- desc: missing namespace
     #  cmd_exec:
     #  - [!bytes "{}", !bytes "{}", 0]
