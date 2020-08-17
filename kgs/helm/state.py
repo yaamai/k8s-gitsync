@@ -6,7 +6,7 @@ from dataclasses_json import dataclass_json
 
 from kgs.consts import KGS_DEFAULT_NS
 from kgs.consts import KGS_MANAGED_KEY
-from kgs.manifests.helm import HelmManifest
+from kgs.helm.manifest import HelmManifest
 
 
 @dataclass_json

@@ -5,9 +5,9 @@ from unittest import mock
 from unittest.mock import mock_open
 
 from kgs.common import Manifest
+from kgs.helm.manifest import HelmManifest
+from kgs.k8s.manifest import K8SManifest
 from kgs.loader import load_recursively
-from kgs.manifests.helm import HelmManifest
-from kgs.manifests.k8s import K8SManifest
 from tests.utils import load_testdata
 
 

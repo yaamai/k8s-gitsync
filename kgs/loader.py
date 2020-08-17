@@ -9,8 +9,8 @@ from typing import Tuple
 
 from kgs import utils
 from kgs.common import Manifest
-from kgs.manifests.helm import HelmManifest
-from kgs.manifests.k8s import K8SManifest
+from kgs.helm.manifest import HelmManifest
+from kgs.k8s.manifest import K8SManifest
 from kgs.result import Result
 
 HELM_MANIFEST_FILE_PATTERN: re.Pattern = re.compile(r"(.*)\.helm$")

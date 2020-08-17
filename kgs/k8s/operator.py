@@ -3,10 +3,10 @@ import json
 import yaml
 
 from kgs import utils
-from kgs.manifests.k8s import K8SManifest
+from kgs.k8s.manifest import K8SManifest
+from kgs.k8s.state import K8SState
 from kgs.result import Result
 from kgs.result import ResultKind
-from kgs.states.k8s import K8SState
 
 
 class K8SOperator:

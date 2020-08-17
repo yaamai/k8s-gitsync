@@ -5,10 +5,10 @@ import yaml
 
 from kgs import utils
 from kgs.consts import KGS_MANAGED_KEY
-from kgs.manifests.helm import HelmManifest
+from kgs.helm.manifest import HelmManifest
+from kgs.helm.state import HelmState
 from kgs.result import Result
 from kgs.result import ResultKind
-from kgs.states.helm import HelmState
 
 
 class HelmOperator:

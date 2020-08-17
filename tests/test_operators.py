@@ -1,10 +1,10 @@
 import unittest
 from unittest import mock
 
-from kgs.manifests.helm import HelmManifest
-from kgs.manifests.k8s import K8SManifest
-from kgs.operators.helm import HelmOperator
-from kgs.operators.k8s import K8SOperator
+from kgs.helm.manifest import HelmManifest
+from kgs.helm.operator import HelmOperator
+from kgs.k8s.manifest import K8SManifest
+from kgs.k8s.operator import K8SOperator
 from tests.utils import load_testdata
 
 

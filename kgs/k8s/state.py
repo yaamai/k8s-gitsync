@@ -4,7 +4,7 @@ from dataclasses import field
 from dataclasses_json import dataclass_json
 
 from kgs.consts import LAST_APPLIED_KEY
-from kgs.manifests.k8s import K8SManifest
+from kgs.k8s.manifest import K8SManifest
 from kgs.utils import _safe_get
 
 
