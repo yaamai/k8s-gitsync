@@ -39,10 +39,10 @@ class K8SOperator:
             return Result.chain(result)
 
         if not notfound and state.is_updated():
-            return Result.ok({})
+            return Result.ok({}, kind=ResultKind.updated)
 
         if dry_run:
-            return Result.ok({})
+            return Result.ok({}, kind=ResultKind.dryrun)
 
         self._ensure_namespace(manifest.metadata.namespace)
 

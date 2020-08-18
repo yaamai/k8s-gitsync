@@ -79,10 +79,10 @@ class HelmOperator:
             return Result.chain(result)
 
         if not notfound and state.is_updated(manifest):
-            return Result.ok({})
+            return Result.ok({}, kind=ResultKind.updated)
 
         if dry_run:
-            return Result.ok({})
+            return Result.ok({}, kind=ResultKind.dryrun)
 
         cmd = []
         cmd += [self.helm_binary_path, "upgrade"]

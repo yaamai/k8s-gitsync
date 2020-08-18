@@ -1,5 +1,6 @@
 import hashlib
 from dataclasses import dataclass
+from dataclasses import field
 from typing import Any
 from typing import Dict
 from typing import List
@@ -21,7 +22,7 @@ from kgs.consts import LAST_APPLIED_KEY
 @dataclass
 class K8SMetadata:
     name: str
-    others: CatchAll
+    others: CatchAll = field(repr=False)
     namespace: str = KGS_DEFAULT_NS
 
 
@@ -32,7 +33,7 @@ class K8SMetadata:
 class K8SManifestBase(Manifest, DataClassJsonMixin):
     kind: str
     metadata: K8SMetadata
-    others: CatchAll
+    others: CatchAll = field(repr=False)
 
 
 class K8SManifest(K8SManifestBase):

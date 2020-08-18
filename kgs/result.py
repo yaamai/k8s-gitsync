@@ -16,7 +16,10 @@ T = TypeVar("T")
 
 class ResultKind(Enum):
     unknown = "unknown"
+    success = "success"
     notfound = "notfound"
+    updated = "updated"
+    dryrun = "dryrun"
 
     def __str__(self):
         return str(self.value)
@@ -35,7 +38,7 @@ class Result(Generic[T]):
     kind: ResultKind = field(default=ResultKind.unknown, metadata=config(encoder=ResultKind.__str__))
 
     @staticmethod
-    def ok(result: T, detail: Optional[dict] = None, kind: ResultKind = ResultKind.unknown) -> "Result[T]":
+    def ok(result: T, detail: Optional[dict] = None, kind: ResultKind = ResultKind.success) -> "Result[T]":
         return Result[T](result, detail, False, kind)
 
     @staticmethod

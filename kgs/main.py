@@ -3,10 +3,10 @@ import sys
 
 from kgs import loader
 from kgs import utils
-from kgs.manifests.helm import HelmManifest
-from kgs.manifests.k8s import K8SManifest
-from kgs.operators.helm import HelmOperator
-from kgs.operators.k8s import K8SOperator
+from kgs.helm.manifest import HelmManifest
+from kgs.helm.operator import HelmOperator
+from kgs.k8s.manifest import K8SManifest
+from kgs.k8s.operator import K8SOperator
 
 
 logger = utils.get_logger(__name__)
@@ -22,7 +22,7 @@ def upgrade_or_install(conf):
         logger.error("")
 
     t = ["    {:64.64}-> {}".format(str(p), str(k)) for (p, k) in result.detail["paths"].items()]
-    logger.info("Finding manifests:\n{}".format("\n".join(t)))
+    logger.info("Parsing manifests:\n{}".format("\n".join(t)))
     logger.info("Loaded manifests:\n{}".format("\n".join(["    {}".format(str(m)) for m in manifests])))
 
     # prepare operator
@@ -31,7 +31,9 @@ def upgrade_or_install(conf):
     operator_map[HelmManifest] = HelmOperator()
 
     for manifest in manifests:
-        operator_map[manifest.__class__].create_or_update(manifest, dry_run=conf.dry_run)
+        oper = operator_map[manifest.__class__]
+        ret = oper.create_or_update(manifest, dry_run=conf.dry_run)
+        logger.info("{}".format(ret))
 
 
 def _parse_conf_and_action():

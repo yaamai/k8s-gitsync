@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from dataclasses import field
 from typing import List
 from typing import Optional
 from typing import Type
@@ -21,7 +22,7 @@ class HelmChart(DataClassJsonMixin):
 @dataclass
 class HelmManifest(Manifest, DataClassJsonMixin):
     name: str
-    chart: HelmChart
+    chart: HelmChart = field(repr=False)
     values: dict
     namespace: str = KGS_DEFAULT_NS
 
