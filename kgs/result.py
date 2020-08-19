@@ -25,7 +25,7 @@ class ResultKind(Enum):
         return str(self.value)
 
     @classmethod
-    def from_str(cls: "Type[ResultKind]", s: str) -> "ResultKind":
+    def from_str(cls: Type["ResultKind"], s: str) -> "ResultKind":
         return ResultKind(s)
 
 
