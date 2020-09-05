@@ -1,20 +1,21 @@
 from typing import Type
+from typing import TypeVar
 
 from typing_extensions import Protocol
 
 
-class State(Protocol):
-    def is_updated(self) -> bool:
-        ...
+ManifestLike = TypeVar("ManifestLike", bound="Manifest")
 
 
 class Manifest(Protocol):
     def get_id(self) -> str:
         ...
 
-    def get_kind(self) -> str:
+    @classmethod
+    def parse_dict(cls: Type[ManifestLike], d: dict) -> ManifestLike:
         ...
 
-    @classmethod
-    def parse_dict(cls: Type["Manifest"], d: dict) -> "Manifest":
+
+class State(Protocol):
+    def is_updated(self, m: Type["Manifest"]) -> bool:
         ...

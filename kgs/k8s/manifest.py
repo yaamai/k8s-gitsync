@@ -46,6 +46,10 @@ class K8SManifest(K8SManifestBase):
         d = super().to_dict(encode_json=encode_json)
         return K8SManifest._annotate_manifest_data(d)
 
+    @classmethod
+    def parse_dict(cls: Type["K8SManifest"], d: dict) -> "K8SManifest":
+        return cls.from_dict(d)
+
     @staticmethod
     def _annotate_manifest_data(data: dict) -> dict:
         hashhex = hashlib.sha256(yaml.dump(data).encode()).hexdigest()
@@ -62,7 +66,7 @@ class K8SManifest(K8SManifestBase):
 
     @classmethod
     def parse_array_of_dict(cls: Type["K8SManifest"], ary: List[dict]) -> List["Manifest"]:
-        return [cls.from_dict(elm) for elm in ary]
+        return [cls.parse_dict(elm) for elm in ary]
 
     @classmethod
     def parse_file(cls: Type["K8SManifest"], filepath: str) -> List["Manifest"]:

@@ -30,6 +30,10 @@ class HelmManifest(Manifest, DataClassJsonMixin):
         return f"helm.{self.namespace}.{self.name}"
 
     @classmethod
+    def parse_dict(cls: Type["HelmManifest"], d: dict) -> "HelmManifest":
+        return cls.from_dict(d)
+
+    @classmethod
     def parse_file(cls: Type["HelmManifest"], helm_file: str, values_files: List[str]) -> List["Manifest"]:
         d: dict = {"values": {}}
 
@@ -39,4 +43,4 @@ class HelmManifest(Manifest, DataClassJsonMixin):
             with open(values_file) as f:
                 d["values"].update(yaml.safe_load(f))
 
-        return [cls.from_dict(d)]
+        return [cls.parse_dict(d)]

@@ -25,7 +25,7 @@ def _safe_get(d: dict, *args: str, default=None):
     return r
 
 
-def probe_k8s():
+def probe_k8s() -> bool:
     _, _, rc = cmd_exec(["kubectl", "version"])
     if rc == 0:
         return True
