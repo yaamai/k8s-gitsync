@@ -39,7 +39,7 @@ class K8SManifestBase(Manifest, DataClassJsonMixin):
 class K8SManifest(K8SManifestBase):
     def get_id(self):
         namespace = self.metadata.namespace
-        return f"{self.kind.lower()}.{namespace}.{self.metadata.name}"
+        return f"k8s.{self.kind.lower()}.{namespace}.{self.metadata.name}"
 
     # override dataclass-json to_dict to update annotated manifest
     def to_dict(self, encode_json=False) -> Dict[str, Any]:

@@ -101,9 +101,9 @@ class HelmOperator:
 
         values = {KGS_MANAGED_KEY: {"managed": True}}
         values.update(manifest.values)
-        outs, _, rc = utils.cmd_exec(cmd, yaml.safe_dump(values).encode())
+        outs, errs, rc = utils.cmd_exec(cmd, yaml.safe_dump(values).encode())
         if rc != 0:
-            return Result.err({})
+            return Result.err({"err": errs.decode()})
 
         # remove WARNING:, DEBUG: Release
         warning_log_re = re.compile(r"^(WARNING:|DEBUG:|Release).*", re.MULTILINE)

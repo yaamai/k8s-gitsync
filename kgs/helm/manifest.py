@@ -23,7 +23,7 @@ class HelmChart(DataClassJsonMixin):
 class HelmManifest(Manifest, DataClassJsonMixin):
     name: str
     chart: HelmChart = field(repr=False)
-    values: dict
+    values: dict = field(repr=False)
     namespace: str = KGS_DEFAULT_NS
 
     def get_id(self) -> str:

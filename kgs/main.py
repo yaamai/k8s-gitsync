@@ -33,7 +33,7 @@ def upgrade_or_install(conf):
     for manifest in manifests:
         oper = operator_map[manifest.__class__]
         ret = oper.create_or_update(manifest, dry_run=conf.dry_run)
-        logger.info("{}".format(ret))
+        logger.info("\n    {:64.64}-> {}".format(manifest.get_id(), ret))
 
 
 def _parse_conf_and_action():
