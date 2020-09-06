@@ -7,6 +7,9 @@ from typing import List
 from typing import Optional
 from typing import Tuple
 
+import yaml
+from toposort import toposort_flatten  # type: ignore
+
 from kgs import utils
 from kgs.common import Manifest
 from kgs.helm.manifest import HelmManifest
@@ -65,10 +68,39 @@ def _update_result(paths: "OrderedDict[Path, ParseResultKind]", files: List[Tupl
         paths[path] = kind
 
 
+def sort_by_dependency(repo, manifests):
+    try:
+        order = {}
+        with open(Path(repo) / "order.yaml") as f:
+            order = yaml.safe_load(f)
+        for k, v in order.items():
+            order[k] = set(v)
+
+        manifest_map = {}
+        for m in manifests:
+            manifest_map[m.get_id()] = m
+
+        sorted_id_list = toposort_flatten(order)
+        sorted_manifests = []
+        for manifest_id in sorted_id_list:
+            m = manifest_map.pop(manifest_id, None)
+            if m:
+                sorted_manifests.append(m)
+        for (_, m) in manifest_map.items():
+            sorted_manifests.append(m)
+
+        return sorted_manifests
+
+    except FileNotFoundError:
+        return manifests
+
+
 def load_recursively(repo_path: str) -> Result[List[Manifest]]:
     # path -> None(not processed), False(skipped), True(processed)
     paths: "OrderedDict[Path, ParseResultKind]" = OrderedDict()
     for path in Path(repo_path).glob("**/*"):
+        if path == (Path(repo_path) / "order.yaml"):
+            continue
         paths[path] = ParseResultKind.not_processed
 
     manifest_list: List[Manifest] = []

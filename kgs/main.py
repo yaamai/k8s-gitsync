@@ -23,6 +23,8 @@ def upgrade_or_install(conf):
 
     t = ["    {:64.64}-> {}".format(str(p), str(k)) for (p, k) in result.detail["paths"].items()]
     logger.info("Parsing manifests:\n{}".format("\n".join(t)))
+
+    manifests = loader.sort_by_dependency(conf.repo, manifests)
     logger.info("Loaded manifests:\n{}".format("\n".join(["    {}".format(str(m)) for m in manifests])))
 
     # prepare operator

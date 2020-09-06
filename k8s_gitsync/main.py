@@ -1,10 +1,12 @@
-import sys
 import argparse
-from toposort import toposort_flatten
-from . import utils
-from . import k8s
+import sys
+
+from toposort import toposort_flatten  # type: ignore
+
 from . import helm
+from . import k8s
 from . import log
+from . import utils
 
 logger = log.getLogger(__name__)
 
