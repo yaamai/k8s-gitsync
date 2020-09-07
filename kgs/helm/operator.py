@@ -73,7 +73,7 @@ class HelmOperator:
         cmd = [self.kubectl_binary_path, "create", "namespace", namespace]
         return utils.cmd_exec(cmd)
 
-    def create_or_update(self, manifest: HelmManifest, dry_run: bool) -> Result[dict]:
+    def create_or_update(self, manifest: HelmManifest, dry_run: bool, wait: bool) -> Result[dict]:
         state, result, [is_err, notfound] = self.get_state(manifest).chk(ResultKind.notfound)
         if is_err:
             return Result.chain(result)
@@ -92,6 +92,8 @@ class HelmOperator:
         cmd += ["--namespace", manifest.namespace]
         cmd += ["--values", "-"]
         cmd += ["--version", manifest.chart.version]
+        if wait:
+            cmd += ["--wait"]
         if manifest.chart.repo is not None and manifest.chart.repo != "":
             cmd += ["--repo", manifest.chart.repo]
         if manifest.chart.localpath is not None and manifest.chart.localpath != "":
