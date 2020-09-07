@@ -12,20 +12,28 @@ from kgs.k8s.operator import K8SOperator
 logger = utils.get_logger(__name__)
 
 
+def _load_manifests(repo: str):
+    manifests, result, [is_err] = loader.load_recursively(repo).chk()
+    if is_err:
+        logger.error(result)
+        return []
+
+    if result.detail:
+        t = ["    {:64.64}-> {}".format(str(p), str(k)) for (p, k) in result.detail["paths"].items()]
+        logger.info("Parsing manifests:\n{}".format("\n".join(t)))
+
+    manifests = loader.sort_by_dependency(repo, manifests)
+    logger.info("Loaded manifests:\n{}".format("\n".join(["    {}".format(str(m)) for m in manifests])))
+
+    return manifests
+
+
 def upgrade_or_install(conf):
     # probe k8s
     if not utils.probe_k8s():
         sys.exit(1)
 
-    manifests, result, [is_err] = loader.load_recursively(conf.repo).chk()
-    if is_err:
-        logger.error("")
-
-    t = ["    {:64.64}-> {}".format(str(p), str(k)) for (p, k) in result.detail["paths"].items()]
-    logger.info("Parsing manifests:\n{}".format("\n".join(t)))
-
-    manifests = loader.sort_by_dependency(conf.repo, manifests)
-    logger.info("Loaded manifests:\n{}".format("\n".join(["    {}".format(str(m)) for m in manifests])))
+    manifests = _load_manifests(conf.repo)
 
     # prepare operator
     operator_map = {}
@@ -36,6 +44,12 @@ def upgrade_or_install(conf):
         oper = operator_map[manifest.__class__]
         ret = oper.create_or_update(manifest, dry_run=conf.dry_run, wait=True)
         logger.info("\n    {:64.64}-> {}".format(manifest.get_id(), ret))
+
+
+def list_id(conf):
+    manifests = _load_manifests(conf.repo)
+    for manifest in manifests:
+        print(manifest.get_id())
 
 
 def _parse_conf_and_action():
@@ -49,6 +63,8 @@ def _parse_conf_and_action():
     conf = parser.parse_args()
 
     action = upgrade_or_install
+    if conf.list_id:
+        return conf, list_id
 
     return conf, action
 
