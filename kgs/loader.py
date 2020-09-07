@@ -2,9 +2,11 @@ import re
 from collections import OrderedDict
 from enum import Enum
 from pathlib import Path
+from typing import Dict
 from typing import Iterable
 from typing import List
 from typing import Optional
+from typing import Set
 from typing import Tuple
 
 import yaml
@@ -68,38 +70,65 @@ def _update_result(paths: "OrderedDict[Path, ParseResultKind]", files: List[Tupl
         paths[path] = kind
 
 
+def _parse_dependencies(depends_data: dict) -> List[str]:
+    # expand order(depend_on, required_by)
+    depends_map: Dict[str, Set] = {}
+
+    def _update_set(key, dat):
+        if key not in depends_map:
+            depends_map[key] = set()
+        depends_map[key] |= dat
+
+    for k, depends_list in depends_data.items():
+        if k not in depends_map:
+            depends_map[k] = set([])
+
+        if isinstance(depends_list, str):
+            _update_set(k, set([depends_list]))
+
+        for depends in depends_list:
+            if isinstance(depends, str):
+                _update_set(k, set([depends]))
+            if isinstance(depends, dict):
+                if "on" in depends:
+                    _update_set(k, set([depends["on"]]))
+                if "by" in depends:
+                    for d in depends["by"]:
+                        _update_set(d, set([k]))
+
+    return toposort_flatten(depends_map)
+
+
 def sort_by_dependency(repo, manifests):
+    depends_data = {}
     try:
-        order = {}
-        with open(Path(repo) / "order.yaml") as f:
-            order = yaml.safe_load(f)
-        for k, v in order.items():
-            order[k] = set(v)
+        with open(Path(repo) / "depends.yaml") as f:
+            depends_data = yaml.safe_load(f)
+    except FileNotFoundError:
+        pass
+    sorted_id_list = _parse_dependencies(depends_data)
 
-        manifest_map = {}
-        for m in manifests:
-            manifest_map[m.get_id()] = m
+    manifest_map = {}
+    for m in manifests:
+        manifest_map[m.get_id()] = m
 
-        sorted_id_list = toposort_flatten(order)
-        sorted_manifests = []
-        for manifest_id in sorted_id_list:
-            m = manifest_map.pop(manifest_id, None)
-            if m:
-                sorted_manifests.append(m)
-        for (_, m) in manifest_map.items():
+    sorted_manifests = []
+    for manifest_id in sorted_id_list:
+        m = manifest_map.pop(manifest_id, None)
+        if m:
             sorted_manifests.append(m)
 
-        return sorted_manifests
+    for (_, m) in manifest_map.items():
+        sorted_manifests.append(m)
 
-    except FileNotFoundError:
-        return manifests
+    return sorted_manifests
 
 
 def load_recursively(repo_path: str) -> Result[List[Manifest]]:
     # path -> None(not processed), False(skipped), True(processed)
     paths: "OrderedDict[Path, ParseResultKind]" = OrderedDict()
     for path in Path(repo_path).glob("**/*"):
-        if path == (Path(repo_path) / "order.yaml"):
+        if path == (Path(repo_path) / "depends.yaml"):
             continue
         paths[path] = ParseResultKind.not_processed
 

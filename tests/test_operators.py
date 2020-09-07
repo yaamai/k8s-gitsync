@@ -43,7 +43,7 @@ class TestK8SOperator(unittest.TestCase):
 
                 oper = K8SOperator()
                 manifest = K8SManifest.from_dict(td["in"])
-                oper.create_or_update(manifest, dry_run=False)
+                oper.create_or_update(manifest, dry_run=False, wait=True)
 
                 if "expect" in td and td.get("expect"):
                     calls = [{"args": list(l.args), "kwargs": l.kwargs} for l in cmd_exec.call_args_list]

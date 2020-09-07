@@ -7,6 +7,7 @@ from unittest.mock import mock_open
 from kgs.common import Manifest
 from kgs.helm.manifest import HelmManifest
 from kgs.k8s.manifest import K8SManifest
+from kgs.loader import _parse_dependencies
 from kgs.loader import load_recursively
 from tests.utils import load_testdata
 
@@ -41,3 +42,10 @@ class TestManifestLoader(unittest.TestCase):
                     else:
                         expected = HelmManifest.from_dict(m)
                     assert expected == manifests.result[idx]
+
+    def test_parse_dependencies(self):
+        testdata = self.testdata["test_parse_dependencies"]
+        for td in testdata:
+            with self.subTest(td["desc"]):
+                actual = _parse_dependencies(td["in"])
+                assert td["out"] == actual

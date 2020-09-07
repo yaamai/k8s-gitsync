@@ -157,3 +157,28 @@ test_recursive_load:
     metadata:
       name: a
       namespace: b
+test_parse_dependencies:
+- desc: empty
+  in: {}
+  out: []
+- desc: depends_on
+  in:
+    a: b
+    b: c
+  out: [c, b, a]
+- desc: depends_on multiple
+  in:
+    a: [b, c]
+    b: [c]
+    c: [d]
+  out: [d, c, b, a]
+- desc: depends_on verbose
+  in:
+    a: ["on": b]
+    b: ["on": c]
+  out: [c, b, a]
+- desc: required by
+  in:
+    a: [by: b]
+    b: [by: c]
+  out: [a, b, c]
