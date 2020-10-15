@@ -1,7 +1,7 @@
 FROM alpine
 ARG ARCH=amd64
 
-RUN apk add --update python3 curl &&\
+RUN apk add --update python3 curl py3-setuptools &&\
     curl -Lo helm.tar.gz https://get.helm.sh/helm-v3.0.0-linux-$ARCH.tar.gz &&\
     curl -Lo kubectl https://storage.googleapis.com/kubernetes-release/release/v1.16.0/bin/linux/$ARCH/kubectl &&\
     tar xf helm.tar.gz &&\

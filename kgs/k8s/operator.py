@@ -47,7 +47,9 @@ class K8SOperator:
         self._ensure_namespace(manifest.metadata.namespace)
 
         cmd = ["kubectl", "apply", "-f", "-"]
-        _, _, _ = utils.cmd_exec(cmd, stdin=yaml.dump(manifest.to_dict()).encode())
+        _, errs, rc = utils.cmd_exec(cmd, stdin=yaml.dump(manifest.to_dict()).encode())
+        if rc != 0:
+            return Result.err({"err": errs.decode(), "ex": {"cmd": cmd}})
 
         # TODO: impl wait
         if wait:

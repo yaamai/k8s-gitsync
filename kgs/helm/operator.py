@@ -105,7 +105,7 @@ class HelmOperator:
         values.update(manifest.values)
         outs, errs, rc = utils.cmd_exec(cmd, yaml.safe_dump(values).encode())
         if rc != 0:
-            return Result.err({"err": errs.decode()})
+            return Result.err({"err": errs.decode(), "ex": {"cmd": cmd}})
 
         # remove WARNING:, DEBUG: Release
         warning_log_re = re.compile(r"^(WARNING:|DEBUG:|Release).*", re.MULTILINE)
