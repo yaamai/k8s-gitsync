@@ -1,6 +1,7 @@
 import re
 from collections import OrderedDict
 from enum import Enum
+from graphlib import TopologicalSorter
 from pathlib import Path
 from typing import Dict
 from typing import Iterable
@@ -10,7 +11,6 @@ from typing import Set
 from typing import Tuple
 
 import yaml
-from toposort import toposort_flatten  # type: ignore
 
 from kgs import utils
 from kgs.common import Manifest
@@ -96,7 +96,8 @@ def _parse_dependencies(depends_data: dict) -> List[str]:
                     for d in depends["by"]:
                         _update_set(d, set([k]))
 
-    return toposort_flatten(depends_map)
+    topo_sorter = TopologicalSorter(depends_map)
+    return list(topo_sorter.static_order())
 
 
 def sort_by_dependency(repo, manifests):
