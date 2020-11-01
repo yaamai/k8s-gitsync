@@ -8,6 +8,7 @@ from typing import Callable
 from typing import Iterable
 from typing import List
 from typing import Optional
+from typing import Tuple
 
 
 def cmd_exec(cmd, stdin=None):
@@ -25,11 +26,11 @@ def _safe_get(d: dict, *args: str, default=None):
     return r
 
 
-def probe_k8s() -> bool:
-    _, _, rc = cmd_exec(["kubectl", "version"])
+def probe_k8s() -> Tuple[str, bool]:
+    _, errs, rc = cmd_exec(["kubectl", "version"])
     if rc == 0:
-        return True
-    return False
+        return "", True
+    return errs.decode().strip(), False
 
 
 def get_logger(name):

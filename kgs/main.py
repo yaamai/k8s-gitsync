@@ -30,7 +30,9 @@ def _load_manifests(repo: str):
 
 def upgrade_or_install(conf):
     # probe k8s
-    if not utils.probe_k8s():
+    msg, ok = utils.probe_k8s()
+    if not ok:
+        print(msg)
         sys.exit(1)
 
     manifests = _load_manifests(conf.repo)
