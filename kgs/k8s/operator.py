@@ -11,7 +11,7 @@ from kgs.result import ResultKind
 
 class K8SOperator:
     @staticmethod
-    def get_state(manifest: K8SManifest) -> Result[K8SState]:
+    async def get_state(manifest: K8SManifest) -> Result[K8SState]:
         namespace = manifest.metadata.namespace
         name = manifest.metadata.name
         kind = manifest.kind
@@ -19,7 +19,7 @@ class K8SOperator:
             return Result.err({"msg": "invalid manifest"})
 
         cmd = ["kubectl", "-n", namespace, "get", kind, name, "-o", "json"]
-        outs, errs, rc = utils.cmd_exec(cmd)
+        outs, errs, rc = await utils.async_cmd_exec(cmd)
         if ("(NotFound):" in errs.decode()) and rc != 0:
             return Result.err({"msg": "state not found"}, ResultKind.notfound)
 
@@ -29,12 +29,12 @@ class K8SOperator:
         return Result.ok(K8SState(m=manifest, state=json.loads(outs.decode())))
 
     @staticmethod
-    def _ensure_namespace(namespace):
+    async def _ensure_namespace(namespace):
         cmd = ["kubectl", "create", "namespace", namespace]
-        return utils.cmd_exec(cmd)
+        return await utils.async_cmd_exec(cmd)
 
     async def create_or_update(self, manifest: K8SManifest, dry_run: bool, wait: bool) -> Result[dict]:
-        state, result, [is_err, notfound] = self.get_state(manifest).chk(ResultKind.notfound)
+        state, result, [is_err, notfound] = (await self.get_state(manifest)).chk(ResultKind.notfound)
         if is_err:
             return Result.chain(result)
 

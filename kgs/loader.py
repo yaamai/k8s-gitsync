@@ -9,6 +9,7 @@ from typing import List
 from typing import Optional
 from typing import Set
 from typing import Tuple
+from typing import Union
 
 import yaml
 
@@ -88,27 +89,31 @@ def _expand_dependency_dict(depends_data: dict) -> Dict[str, Set]:
     # <id>: [{"by": <required-by-id>}, ...]
     depends_map: Dict[str, Set] = {}
 
-    def _update_set(key, dat):
+    def _update_set(key, dat: Union[str, list]):
         if key not in depends_map:
             depends_map[key] = set()
-        depends_map[key] |= dat
+
+        if isinstance(dat, str):
+            depends_map[key] |= set([dat])
+        if isinstance(dat, list):
+            depends_map[key] |= set(dat)
 
     for k, depends_list in depends_data.items():
         if k not in depends_map:
             depends_map[k] = set([])
 
         if isinstance(depends_list, str):
-            _update_set(k, set([depends_list]))
+            _update_set(k, depends_list)
+            continue
 
         for depends in depends_list:
             if isinstance(depends, str):
-                _update_set(k, set([depends]))
+                _update_set(k, depends)
             if isinstance(depends, dict):
                 if "on" in depends:
-                    _update_set(k, set([depends["on"]]))
+                    _update_set(k, depends["on"])
                 if "by" in depends:
-                    for d in depends["by"]:
-                        _update_set(d, set([k]))
+                    _update_set(depends["by"], k)
     return depends_map
 
 

@@ -51,16 +51,19 @@ async def _async_upgrade_or_install(conf):
     operator_map[K8SManifest] = K8SOperator()
     operator_map[HelmManifest] = HelmOperator()
 
-    pending_tasks = []
+    pending_tasks = set()
     sorter.prepare()
     while sorter.is_active():
         for node in sorter.get_ready():
             manifest = manifest_map.get(node)
+            if not manifest:
+                logger.warning("Receive manifest id {} but not loaded (maybe id only in depends)".format(node))
+                continue
             oper = operator_map[manifest.__class__]
             task = asyncio.create_task(
                 oper.create_or_update(manifest, dry_run=conf.dry_run, wait=True), name=manifest.get_id()
             )
-            pending_tasks.append(task)
+            pending_tasks |= set([task])
 
         done_set, pending_tasks = await asyncio.wait(pending_tasks, return_when=asyncio.FIRST_COMPLETED)
         for done in done_set:
@@ -68,6 +71,8 @@ async def _async_upgrade_or_install(conf):
             sorter.done(manifest.get_id())
 
             logger.info("\n    {:64.64}-> {}".format(manifest.get_id(), done.result()))
+        if len(pending_tasks) == 0:
+            break
 
 
 def upgrade_or_install(conf):

@@ -16,19 +16,19 @@ class HelmOperator:
         self.helm_binary_path = helm_binary_path
         self.kubectl_binary_path = kubectl_binary_path
 
-    def get_release_list(self) -> dict:
+    async def get_release_list(self) -> dict:
         cmd = [self.helm_binary_path, "list", "--output", "json", "--all-namespaces"]
-        outs, _, _ = utils.cmd_exec(cmd)
+        outs, _, _ = await utils.async_cmd_exec(cmd)
         return json.loads(outs.decode())
 
-    def get_release(self, namespace: str, name: str) -> Result[dict]:
-        release_list = self.get_release_list()
+    async def get_release(self, namespace: str, name: str) -> Result[dict]:
+        release_list = await self.get_release_list()
         for e in release_list:
             if e["namespace"] == namespace and e["name"] == name:
                 return Result.ok(e)
         return Result.err({}, ResultKind.notfound)
 
-    def get_values(self, namespace: str, release_name: str) -> Result[dict]:
+    async def get_values(self, namespace: str, release_name: str) -> Result[dict]:
         cmd = [
             self.helm_binary_path,
             "-n",
@@ -39,7 +39,7 @@ class HelmOperator:
             "--output",
             "json",
         ]
-        outs, errs, rc = utils.cmd_exec(cmd)
+        outs, errs, rc = await utils.async_cmd_exec(cmd)
 
         if ("release: not found" in errs.decode()) and rc != 0:
             return Result.err({"msg": "notfound"}, ResultKind.notfound)
@@ -49,15 +49,15 @@ class HelmOperator:
         values = json.loads(outs.decode())
         return Result.ok(values)
 
-    def get_state(self, manifest: HelmManifest) -> Result[HelmState]:
+    async def get_state(self, manifest: HelmManifest) -> Result[HelmState]:
         namespace = manifest.namespace
         name = manifest.name
 
-        release, ret, [is_err, notfound] = self.get_release(namespace, name).chk(ResultKind.notfound)
+        release, ret, [is_err, notfound] = (await self.get_release(namespace, name)).chk(ResultKind.notfound)
         if is_err or notfound:
             return Result.chain(ret)
 
-        values, ret, [is_err] = self.get_values(namespace, name).chk()
+        values, ret, [is_err] = (await self.get_values(namespace, name)).chk()
         if is_err:
             return Result.chain(ret)
 
@@ -74,7 +74,7 @@ class HelmOperator:
         return utils.cmd_exec(cmd)
 
     async def create_or_update(self, manifest: HelmManifest, dry_run: bool, wait: bool) -> Result[dict]:
-        state, result, [is_err, notfound] = self.get_state(manifest).chk(ResultKind.notfound)
+        state, result, [is_err, notfound] = (await self.get_state(manifest)).chk(ResultKind.notfound)
         if is_err:
             return Result.chain(result)
 
