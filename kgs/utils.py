@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import os
 import re
@@ -9,6 +10,15 @@ from typing import Iterable
 from typing import List
 from typing import Optional
 from typing import Tuple
+
+
+async def async_cmd_exec(cmd, stdin=None):
+    proc = await asyncio.create_subprocess_exec(
+        cmd[0], cmd[1:], stdout=asyncio.subprocess.PIPE, stdin=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
+    )
+
+    outs, errs = await proc.communicate(stdin)
+    return outs, errs, proc.returncode
 
 
 def cmd_exec(cmd, stdin=None):

@@ -70,8 +70,22 @@ def _update_result(paths: "OrderedDict[Path, ParseResultKind]", files: List[Tupl
         paths[path] = kind
 
 
-def _parse_dependencies(depends_data: dict) -> List[str]:
-    # expand order(depend_on, required_by)
+def _load_depends_data(repo, manifests) -> Dict[str, List[str]]:
+    # defaults to no dependency
+    depends_data: Dict[str, List[str]] = {m.get_id(): [] for m in manifests}
+    try:
+        with open(Path(repo) / "depends.yaml") as f:
+            depends_data |= yaml.safe_load(f)
+    except FileNotFoundError:
+        pass
+
+    return depends_data
+
+
+def _expand_dependency_dict(depends_data: dict) -> Dict[str, Set]:
+    # <id>: <dependency-id>
+    # <id>: [<dependency-id>, ...]
+    # <id>: [{"by": <required-by-id>}, ...]
     depends_map: Dict[str, Set] = {}
 
     def _update_set(key, dat):
@@ -95,34 +109,24 @@ def _parse_dependencies(depends_data: dict) -> List[str]:
                 if "by" in depends:
                     for d in depends["by"]:
                         _update_set(d, set([k]))
-
-    topo_sorter = TopologicalSorter(depends_map)
-    return list(topo_sorter.static_order())
+    return depends_map
 
 
-def sort_by_dependency(repo, manifests):
-    depends_data = {}
-    try:
-        with open(Path(repo) / "depends.yaml") as f:
-            depends_data = yaml.safe_load(f)
-    except FileNotFoundError:
-        pass
-    sorted_id_list = _parse_dependencies(depends_data)
+def get_topo_sorter(repo, manifests) -> TopologicalSorter:
+    depends_data = _load_depends_data(repo, manifests)
+    depends_map = _expand_dependency_dict(depends_data)
+
+    return TopologicalSorter(depends_map)
+
+
+def sorted_manifests(repo, manifests):
+    sorter = get_topo_sorter(repo, manifests)
 
     manifest_map = {}
     for m in manifests:
         manifest_map[m.get_id()] = m
-
-    sorted_manifests = []
-    for manifest_id in sorted_id_list:
-        m = manifest_map.pop(manifest_id, None)
-        if m:
-            sorted_manifests.append(m)
-
-    for (_, m) in manifest_map.items():
-        sorted_manifests.append(m)
-
-    return sorted_manifests
+    for manifest_id in sorter.static_order():
+        yield manifest_map.get(manifest_id)
 
 
 def load_recursively(repo_path: str) -> Result[List[Manifest]]:

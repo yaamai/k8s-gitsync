@@ -73,7 +73,7 @@ class HelmOperator:
         cmd = [self.kubectl_binary_path, "create", "namespace", namespace]
         return utils.cmd_exec(cmd)
 
-    def create_or_update(self, manifest: HelmManifest, dry_run: bool, wait: bool) -> Result[dict]:
+    async def create_or_update(self, manifest: HelmManifest, dry_run: bool, wait: bool) -> Result[dict]:
         state, result, [is_err, notfound] = self.get_state(manifest).chk(ResultKind.notfound)
         if is_err:
             return Result.chain(result)
@@ -103,7 +103,7 @@ class HelmOperator:
 
         values = {KGS_MANAGED_KEY: {"managed": True}}
         values.update(manifest.values)
-        outs, errs, rc = utils.cmd_exec(cmd, yaml.safe_dump(values).encode())
+        outs, errs, rc = await utils.async_cmd_exec(cmd, yaml.safe_dump(values).encode())
         if rc != 0:
             return Result.err({"err": errs.decode(), "ex": {"cmd": cmd}})
 
